@@ -29,6 +29,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Locale;
 
 public class GCLogin extends AbstractLogin {
 
@@ -268,7 +269,7 @@ public class GCLogin extends AbstractLogin {
      */
     private static void detectGcCustomDate() {
 
-        final String result = Network.getResponseData(Network.getRequest("https://www.geocaching.com/myaccount/settings/preferences"));
+        final String result = Network.getResponseData(Network.getRequest("https://www.geocaching.com/account/settings/preferences"));
 
         if (null == result) {
             Log.w("Login.detectGcCustomDate: result is null");
@@ -282,7 +283,7 @@ public class GCLogin extends AbstractLogin {
     }
 
     public static Date parseGcCustomDate(final String input, final String format) throws ParseException {
-        return new SimpleDateFormat(format).parse(input.trim());
+        return new SimpleDateFormat(format, Locale.ENGLISH).parse(input.trim());
     }
 
     public static Date parseGcCustomDate(final String input) throws ParseException {
@@ -290,7 +291,7 @@ public class GCLogin extends AbstractLogin {
     }
 
     public static String formatGcCustomDate(int year, int month, int day) {
-        return new SimpleDateFormat(Settings.getGcCustomDate()).format(new GregorianCalendar(year, month - 1, day).getTime());
+        return new SimpleDateFormat(Settings.getGcCustomDate(), Locale.ENGLISH).format(new GregorianCalendar(year, month - 1, day).getTime());
     }
 
     /**

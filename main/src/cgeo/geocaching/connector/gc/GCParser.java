@@ -57,6 +57,8 @@ import rx.Subscriber;
 import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func2;
+import rx.schedulers.Schedulers;
+import rx.util.async.Async;
 
 import android.net.Uri;
 import android.text.Html;
@@ -295,6 +297,12 @@ public abstract class GCParser {
 
         if (!cids.isEmpty() && (Settings.isGCPremiumMember() || showCaptcha) && ((recaptchaReceiver == null || StringUtils.isBlank(recaptchaReceiver.getChallenge())) || StringUtils.isNotBlank(recaptchaText))) {
             Log.i("Trying to get .loc for " + cids.size() + " caches");
+            final Observable<Set<Geocache>> storedCaches = Async.start(new Func0<Set<Geocache>>() {
+                @Override
+                public Set<Geocache> call() {
+                    return DataStore.loadCaches(Geocache.getGeocodes(caches), LoadFlags.LOAD_CACHE_OR_DB);
+                }
+            }, Schedulers.io());
 
             try {
                 // get coordinates for parsed caches
@@ -320,7 +328,7 @@ public abstract class GCParser {
                     return searchResult;
                 }
 
-                LocParser.parseLoc(searchResult, coordinates);
+                LocParser.parseLoc(searchResult, coordinates, storedCaches.toBlocking().single());
 
             } catch (final RuntimeException e) {
                 Log.e("GCParser.parseSearch.CIDs", e);
@@ -1728,7 +1736,7 @@ public abstract class GCParser {
                         final String logIconNameExt = entry.path("LogTypeImage").asText(".gif");
                         final String logIconName = logIconNameExt.substring(0, logIconNameExt.length() - 4);
 
-                        long date = 0;
+                        long date;
                         try {
                             date = GCLogin.parseGcCustomDate(entry.get("Visited").asText()).getTime();
                         } catch (ParseException | NullPointerException e) {
