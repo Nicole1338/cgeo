@@ -9,15 +9,19 @@ import cgeo.geocaching.connector.ConnectorFactory;
 import cgeo.geocaching.connector.capability.ILogin;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.enumerations.StatusCode;
-import cgeo.geocaching.geopoint.Geopoint;
-import cgeo.geocaching.geopoint.Units;
 import cgeo.geocaching.list.PseudoList;
 import cgeo.geocaching.list.StoredList;
+import cgeo.geocaching.location.AndroidGeocoder;
+import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.location.MapQuestGeocoder;
+import cgeo.geocaching.location.Units;
 import cgeo.geocaching.maps.CGeoMap;
+import cgeo.geocaching.network.Network;
+import cgeo.geocaching.sensors.GeoData;
 import cgeo.geocaching.sensors.GeoDirHandler;
 import cgeo.geocaching.sensors.GpsStatusProvider;
 import cgeo.geocaching.sensors.GpsStatusProvider.Status;
-import cgeo.geocaching.sensors.IGeoData;
+import cgeo.geocaching.sensors.Sensors;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.settings.SettingsActivity;
 import cgeo.geocaching.ui.dialog.Dialogs;
@@ -35,21 +39,23 @@ import com.google.zxing.integration.android.IntentResult;
 import org.apache.commons.lang3.StringUtils;
 
 import rx.Observable;
-import rx.Observable.OnSubscribe;
-import rx.Subscriber;
-import rx.android.observables.AndroidObservable;
+import rx.android.app.AppObservable;
 import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Func1;
 
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.app.SearchManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.location.Address;
-import android.location.Geocoder;
+import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -69,7 +75,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 
 public class MainActivity extends AbstractActionBarActivity {
     @InjectView(R.id.nav_satellites) protected TextView navSatellites;
@@ -88,11 +93,9 @@ public class MainActivity extends AbstractActionBarActivity {
 
     public static final int SEARCH_REQUEST_CODE = 2;
 
-    private int version = 0;
-    private boolean cleanupRunning = false;
-    private int countBubbleCnt = 0;
     private Geopoint addCoords = null;
     private boolean initialized = false;
+    private ConnectivityChangeReceiver connectivityChangeReceiver;
 
     private final UpdateLocation locationUpdater = new UpdateLocation();
 
@@ -110,7 +113,7 @@ public class MainActivity extends AbstractActionBarActivity {
 
             for (final ILogin conn : loginConns) {
 
-                final TextView connectorInfo = (TextView) inflater.inflate(R.layout.main_activity_connectorstatus, null);
+                final TextView connectorInfo = (TextView) inflater.inflate(R.layout.main_activity_connectorstatus, infoArea, false);
                 infoArea.addView(connectorInfo);
 
                 final StringBuilder userInfo = new StringBuilder(conn.getName()).append(Formatter.SEPARATOR);
@@ -127,6 +130,19 @@ public class MainActivity extends AbstractActionBarActivity {
             }
         }
     };
+
+    private final class ConnectivityChangeReceiver extends BroadcastReceiver {
+        private boolean isConnected = Network.isNetworkConnected();
+
+        @Override
+        public void onReceive(final Context context, final Intent intent) {
+            final boolean wasConnected = isConnected;
+            isConnected = Network.isNetworkConnected();
+            if (isConnected && !wasConnected) {
+                startBackgroundLogin();
+            }
+        }
+    }
 
     private static String formatAddress(final Address address) {
         final ArrayList<String> addressParts = new ArrayList<>();
@@ -193,8 +209,7 @@ public class MainActivity extends AbstractActionBarActivity {
 
         setDefaultKeyMode(DEFAULT_KEYS_SEARCH_LOCAL); // type to search
 
-        version = Version.getVersionCode(this);
-        Log.i("Starting " + getPackageName() + ' ' + version + " a.k.a " + Version.getVersionName(this));
+        Log.i("Starting " + getPackageName() + ' ' + Version.getVersionCode(this) + " a.k.a " + Version.getVersionName(this));
 
         init();
 
@@ -211,25 +226,25 @@ public class MainActivity extends AbstractActionBarActivity {
     @Override
     public void onResume() {
         super.onResume(locationUpdater.start(GeoDirHandler.UPDATE_GEODATA | GeoDirHandler.LOW_POWER),
-                app.gpsStatusObservable().observeOn(AndroidSchedulers.mainThread()).subscribe(satellitesHandler));
+                Sensors.getInstance().gpsStatusObservable().observeOn(AndroidSchedulers.mainThread()).subscribe(satellitesHandler));
         updateUserInfoHandler.sendEmptyMessage(-1);
-        if (app.hasValidLocation()) {
-            locationUpdater.updateGeoData(app.currentGeo());
-        }
         startBackgroundLogin();
         init();
+
+        connectivityChangeReceiver = new ConnectivityChangeReceiver();
+        registerReceiver(connectivityChangeReceiver, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
     }
 
     private void startBackgroundLogin() {
-        assert(app != null);
+        assert app != null;
 
         final boolean mustLogin = app.mustRelog();
 
         for (final ILogin conn : ConnectorFactory.getActiveLiveConnectors()) {
             if (mustLogin || !conn.isLoggedIn()) {
-                new Thread() {
+                RxUtils.networkScheduler.createWorker().schedule(new Action0() {
                     @Override
-                    public void run() {
+                    public void call() {
                         if (mustLogin) {
                             // Properly log out from geocaching.com
                             conn.logout();
@@ -237,7 +252,7 @@ public class MainActivity extends AbstractActionBarActivity {
                         conn.login(firstLoginHandler, MainActivity.this);
                         updateUserInfoHandler.sendEmptyMessage(-1);
                     }
-                }.start();
+                });
             }
         }
     }
@@ -259,6 +274,7 @@ public class MainActivity extends AbstractActionBarActivity {
     @Override
     public void onPause() {
         initialized = false;
+        unregisterReceiver(connectivityChangeReceiver);
         super.onPause();
     }
 
@@ -430,7 +446,7 @@ public class MainActivity extends AbstractActionBarActivity {
 
         setFilterTitle();
         checkRestore();
-        (new CleanDatabaseThread()).start();
+        DataStore.cleanIfNeeded(this);
     }
 
     protected void selectGlobalTypeFilter() {
@@ -484,7 +500,23 @@ public class MainActivity extends AbstractActionBarActivity {
     }
 
     public void updateCacheCounter() {
-        (new CountBubbleUpdateThread()).start();
+        AppObservable.bindActivity(this, DataStore.getAllCachesCountObservable()).subscribe(new Action1<Integer>() {
+            @Override
+            public void call(final Integer countBubbleCnt1) {
+                if (countBubbleCnt1 == 0) {
+                    countBubble.setVisibility(View.GONE);
+                } else {
+                    countBubble.setText(Integer.toString(countBubbleCnt1));
+                    countBubble.bringToFront();
+                    countBubble.setVisibility(View.VISIBLE);
+                }
+            }
+        }, new Action1<Throwable>() {
+            @Override
+            public void call(final Throwable throwable) {
+                Log.e("Unable to add bubble count", throwable);
+            }
+        });
     }
 
     private void checkRestore() {
@@ -517,7 +549,7 @@ public class MainActivity extends AbstractActionBarActivity {
     private class UpdateLocation extends GeoDirHandler {
 
         @Override
-        public void updateGeoData(final IGeoData geo) {
+        public void updateGeoData(final GeoData geo) {
             if (!nearestView.isClickable()) {
                 nearestView.setFocusable(true);
                 nearestView.setClickable(true);
@@ -539,29 +571,21 @@ public class MainActivity extends AbstractActionBarActivity {
                 navAccuracy.setText(null);
             }
 
+            final Geopoint currentCoords = geo.getCoords();
             if (Settings.isShowAddress()) {
                 if (addCoords == null) {
                     navLocation.setText(R.string.loc_no_addr);
                 }
-                if (addCoords == null || (geo.getCoords().distanceTo(addCoords) > 0.5)) {
-                    final Observable<String> address = Observable.create(new OnSubscribe<String>() {
+                if (addCoords == null || (currentCoords.distanceTo(addCoords) > 0.5)) {
+                    addCoords = currentCoords;
+                    final Observable<String> address = (new AndroidGeocoder(MainActivity.this).getFromLocation(currentCoords)
+                            .onErrorResumeNext(MapQuestGeocoder.getFromLocation(currentCoords))).map(new Func1<Address, String>() {
                         @Override
-                        public void call(final Subscriber<? super String> subscriber) {
-                            try {
-                                addCoords = geo.getCoords();
-                                final Geocoder geocoder = new Geocoder(MainActivity.this, Locale.getDefault());
-                                final Geopoint coords = app.currentGeo().getCoords();
-                                final List<Address> addresses = geocoder.getFromLocation(coords.getLatitude(), coords.getLongitude(), 1);
-                                if (!addresses.isEmpty()) {
-                                    subscriber.onNext(formatAddress(addresses.get(0)));
-                                }
-                                subscriber.onCompleted();
-                            } catch (final Exception e) {
-                                subscriber.onError(e);
-                            }
+                        public String call(final Address address) {
+                            return formatAddress(address);
                         }
-                    });
-                    AndroidObservable.bindActivity(MainActivity.this, address.onErrorResumeNext(Observable.just(geo.getCoords().toString())))
+                    }).onErrorResumeNext(Observable.just(currentCoords.toString()));
+                    AppObservable.bindActivity(MainActivity.this, address)
                             .subscribeOn(RxUtils.networkScheduler)
                             .subscribe(new Action1<String>() {
                                 @Override
@@ -571,7 +595,7 @@ public class MainActivity extends AbstractActionBarActivity {
                             });
                 }
             } else {
-                navLocation.setText(geo.getCoords().toString());
+                navLocation.setText(currentCoords.toString());
             }
         }
     }
@@ -590,10 +614,6 @@ public class MainActivity extends AbstractActionBarActivity {
      *            unused here but needed since this method is referenced from XML layout
      */
     public void cgeoFindNearest(final View v) {
-        if (app.currentGeo().getCoords() == null) {
-            return;
-        }
-
         nearestView.setPressed(true);
         startActivity(CacheListActivity.getNearestIntent(this));
     }
@@ -640,79 +660,6 @@ public class MainActivity extends AbstractActionBarActivity {
      */
     public void cgeoNavSettings(final View v) {
         startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-    }
-
-    private class CountBubbleUpdateThread extends Thread {
-        private final Handler countBubbleHandler = new Handler() {
-
-            @Override
-            public void handleMessage(final Message msg) {
-                try {
-                    if (countBubbleCnt == 0) {
-                        countBubble.setVisibility(View.GONE);
-                    } else {
-                        countBubble.setText(Integer.toString(countBubbleCnt));
-                        countBubble.bringToFront();
-                        countBubble.setVisibility(View.VISIBLE);
-                    }
-                } catch (final Exception e) {
-                    Log.w("MainActivity.countBubbleHander", e);
-                }
-            }
-        };
-
-        @Override
-        public void run() {
-            if (app == null) {
-                return;
-            }
-
-            int checks = 0;
-            while (!DataStore.isInitialized()) {
-                try {
-                    sleep(500);
-                    checks++;
-                } catch (final Exception e) {
-                    Log.e("MainActivity.CountBubbleUpdateThread.run", e);
-                }
-
-                if (checks > 10) {
-                    return;
-                }
-            }
-
-            countBubbleCnt = DataStore.getAllCachesCount();
-
-            countBubbleHandler.sendEmptyMessage(0);
-        }
-    }
-
-    private class CleanDatabaseThread extends Thread {
-
-        @Override
-        public void run() {
-            if (app == null) {
-                return;
-            }
-            if (cleanupRunning) {
-                return;
-            }
-
-            boolean more = false;
-            if (version != Settings.getVersion()) {
-                Log.i("Initializing hard cleanup - version changed from " + Settings.getVersion() + " to " + version + ".");
-
-                more = true;
-            }
-
-            cleanupRunning = true;
-            DataStore.clean(more);
-            cleanupRunning = false;
-
-            if (version > 0) {
-                Settings.setVersion(version);
-            }
-        }
     }
 
     private void checkShowChangelog() {

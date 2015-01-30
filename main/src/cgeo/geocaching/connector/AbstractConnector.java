@@ -15,10 +15,12 @@ import cgeo.geocaching.connector.capability.ISearchByOwner;
 import cgeo.geocaching.connector.capability.ISearchByViewPort;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.enumerations.LogType;
-import cgeo.geocaching.geopoint.Geopoint;
+import cgeo.geocaching.location.Geopoint;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
+
 import rx.functions.Action1;
 
 import java.util.ArrayList;
@@ -38,12 +40,12 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public boolean addToWatchlist(Geocache cache) {
+    public boolean addToWatchlist(@NonNull final Geocache cache) {
         return false;
     }
 
     @Override
-    public boolean removeFromWatchlist(Geocache cache) {
+    public boolean removeFromWatchlist(@NonNull final Geocache cache) {
         return false;
     }
 
@@ -53,7 +55,7 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public boolean uploadPersonalNote(Geocache cache) {
+    public boolean uploadPersonalNote(@NonNull final Geocache cache) {
         throw new UnsupportedOperationException();
     }
 
@@ -63,7 +65,7 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public boolean uploadModifiedCoordinates(Geocache cache, Geopoint wpt) {
+    public boolean uploadModifiedCoordinates(@NonNull final Geocache cache, @NonNull final Geopoint wpt) {
         throw new UnsupportedOperationException();
     }
 
@@ -71,12 +73,12 @@ public abstract class AbstractConnector implements IConnector {
      * {@link IConnector}
      */
     @Override
-    public boolean deleteModifiedCoordinates(Geocache cache) {
+    public boolean deleteModifiedCoordinates(@NonNull final Geocache cache) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean supportsFavoritePoints(final Geocache cache) {
+    public boolean supportsFavoritePoints(@NonNull final Geocache cache) {
         return false;
     }
 
@@ -91,36 +93,38 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public boolean canLog(Geocache cache) {
+    public boolean canLog(@NonNull final Geocache cache) {
         return false;
     }
 
     @Override
-    public ILoggingManager getLoggingManager(final LogCacheActivity activity, final Geocache cache) {
+    @NonNull
+    public ILoggingManager getLoggingManager(@NonNull final LogCacheActivity activity, @NonNull final Geocache cache) {
         return new NoLoggingManager();
     }
 
     @Override
+    @NonNull
     public String getLicenseText(final @NonNull Geocache cache) {
-        return null;
+        return StringUtils.EMPTY;
     }
 
     protected static boolean isNumericId(final String str) {
         try {
             return Integer.parseInt(str) > 0;
-        } catch (NumberFormatException ignored) {
+        } catch (final NumberFormatException ignored) {
         }
         return false;
     }
 
     @Override
-    public boolean isZippedGPXFile(String fileName) {
+    public boolean isZippedGPXFile(@NonNull final String fileName) {
         // don't accept any file by default
         return false;
     }
 
     @Override
-    public boolean isReliableLatLon(boolean cacheHasReliableLatLon) {
+    public boolean isReliableLatLon(final boolean cacheHasReliableLatLon) {
         // let every cache have reliable coordinates by default
         return true;
     }
@@ -128,9 +132,8 @@ public abstract class AbstractConnector implements IConnector {
     @Override
     public String getGeocodeFromUrl(final String url) {
         final String urlPrefix = getCacheUrlPrefix();
-        if (StringUtils.startsWith(url, urlPrefix)) {
-            @NonNull
-            String geocode = url.substring(urlPrefix.length());
+        if (StringUtils.isEmpty(urlPrefix) || StringUtils.startsWith(url, urlPrefix)) {
+            @NonNull final String geocode = url.substring(urlPrefix.length());
             if (canHandle(geocode)) {
                 return geocode;
             }
@@ -138,9 +141,11 @@ public abstract class AbstractConnector implements IConnector {
         return null;
     }
 
+    @NonNull
     abstract protected String getCacheUrlPrefix();
 
     @Override
+    @Nullable
     public String getLongCacheUrl(final @NonNull Geocache cache) {
         return getCacheUrl(cache);
     }
@@ -151,7 +156,7 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public int getCacheMapMarkerId(boolean disabled) {
+    public int getCacheMapMarkerId(final boolean disabled) {
         if (disabled) {
             return R.drawable.marker_disabled_other;
         }
@@ -159,7 +164,8 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public List<LogType> getPossibleLogTypes(Geocache geocache) {
+    @NonNull
+    public List<LogType> getPossibleLogTypes(@NonNull final Geocache geocache) {
         final List<LogType> logTypes = new ArrayList<>();
         if (geocache.isEventCache()) {
             logTypes.add(LogType.WILL_ATTEND);
@@ -196,13 +202,14 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public String getWaypointGpxId(String prefix, String geocode) {
+    public String getWaypointGpxId(final String prefix, final String geocode) {
         // Default: just return the prefix
         return prefix;
     }
 
     @Override
-    public String getWaypointPrefix(String name) {
+    @NonNull
+    public String getWaypointPrefix(final String name) {
         // Default: just return the name
         return name;
     }
@@ -213,8 +220,9 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
+    @NonNull
     public final Collection<String> getCapabilities() {
-        ArrayList<String> list = new ArrayList<>();
+        final ArrayList<String> list = new ArrayList<>();
         addCapability(list, ISearchByViewPort.class, R.string.feature_search_live_map);
         addCapability(list, ISearchByKeyword.class, R.string.feature_search_keyword);
         addCapability(list, ISearchByCenter.class, R.string.feature_search_center);
@@ -245,20 +253,20 @@ public abstract class AbstractConnector implements IConnector {
         }
     }
 
-    private static String feature(int featureResourceId) {
+    private static String feature(final int featureResourceId) {
         return CgeoApplication.getInstance().getString(featureResourceId);
     }
 
     @Override
     public @NonNull
     List<UserAction> getUserActions() {
-        List<UserAction> actions = getDefaultUserActions();
+        final List<UserAction> actions = getDefaultUserActions();
 
         if (this instanceof ISearchByOwner) {
             actions.add(new UserAction(R.string.user_menu_view_hidden, new Action1<Context>() {
 
                 @Override
-                public void call(Context context) {
+                public void call(final Context context) {
                     CacheListActivity.startActivityOwner(context.activity, context.userName);
                 }
             }));
@@ -268,7 +276,7 @@ public abstract class AbstractConnector implements IConnector {
             actions.add(new UserAction(R.string.user_menu_view_found, new Action1<UserAction.Context>() {
 
                 @Override
-                public void call(Context context) {
+                public void call(final Context context) {
                     CacheListActivity.startActivityFinder(context.activity, context.userName);
                 }
             }));
@@ -286,7 +294,7 @@ public abstract class AbstractConnector implements IConnector {
             actions.add(new UserAction(R.string.user_menu_open_contact, new Action1<UserAction.Context>() {
 
                 @Override
-                public void call(Context context) {
+                public void call(final Context context) {
                     ContactsAddon.openContactCard(context.activity, context.userName);
                 }
             }));

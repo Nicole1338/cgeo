@@ -74,12 +74,13 @@
   <string name="log_tb_visit">Visitat</string>
   <string name="log_tb_drop">Deixat</string>
   <string name="log_tb_changeall">Canvia-ho tot</string>
-  <string name="log_save">Desa</string>
+  <string name="log_save">Guarda-ho  fora de línia</string>
   <string name="log_saving">S\'està enviant el registre…</string>
   <string name="log_saving_and_uploading">S\'està enviant el registre i pujant la imatge…</string>
   <string name="log_clear">Esborra</string>
   <string name="log_post_not_possible">S\'està carregant la pàgina del registre…</string>
   <string name="log_add">Afegeix</string>
+  <string name="log_repeat">Repeteix l\'últim registre</string>
   <string name="log_no_rating">Sense puntuació</string>
   <string name="log_stars_1_description">Pobre</string>
   <string name="log_stars_15_description">Bastant pobre</string>
@@ -124,6 +125,7 @@
   <string name="err_login">No hi ha desada cap informació d\'accés</string>
   <string name="err_login_failed_toast">El c:geo no pot iniciar la sessió. El c:geo treballa fora línia amb els catxés desats. Comproveu la configuració de la connexió o activeu la connexió a Internet.</string>
   <string name="err_unknown">Error desconegut</string>
+  <string name="err_unknown_address">c:geo no ha pogut assignar aquesta adreça a una ubicació existent</string>
   <string name="err_comm">S\'ha produït un error de comunicació desconegut</string>
   <string name="err_missing_auth">No s\'ha definit nom d\'usuari i/o contrasenya.</string>
   <string name="err_wrong">La informació d\'accés és incorrecta</string>
@@ -158,7 +160,6 @@
   <string name="err_acquire_image_failed">S\'ha produït un error a l\'adquirir una imatge.</string>
   <string name="err_tb_display">El c:geo no pot mostrar el traçable que volíeu. És realment un traçable?</string>
   <string name="err_tb_details_open">El c:geo no pot obrir els detalls del traçable.</string>
-  <string name="err_tb_forgot_saw">El c:geo no recorda quin traçable heu vist.</string>
   <string name="err_tb_find">El c:geo no pot trobar el traçable</string>
   <string name="err_tb_find_that">El c:geo no pot trobar aquest traçable.</string>
   <string name="err_waypoint_cache_unknown">El c:geo no sap a quin catxé voleu afegir la fita.</string>
@@ -166,15 +167,13 @@
   <string name="err_point_unknown_position">El c:geo no pot reconèixer on ets.</string>
   <string name="err_point_no_position_given_title">Cal informació</string>
   <string name="err_point_no_position_given">Ompliu la latitud i la longitud o la distància i la direcció. També podeu omplir els quatre camps.</string>
-  <string name="err_point_curr_position_unavailable">El c:geo encara no té les coordenades actuals. Espereu una estona…</string>
   <string name="err_point_bear_and_dist_title">Necessiteu ajuda?</string>
   <string name="err_point_bear_and_dist">Ompliu el rumb i la distància. El rumb son angles del 0º al 360º respecte al Nord. La distància no necessita unitats.</string>
   <string name="err_log_load_data">El c:geo no pot carregar les dades necessàries per registrar la visita.</string>
   <string name="err_log_load_data_again">El c:geo no pot carregar les dades necessàries per registrar la visita. Torneu a intentar-ho.</string>
   <string name="err_log_load_data_still">El c:geo encara està carregant les dades necessàries per enviar el registre. Si us plau, espereu una estona més.</string>
-  <string name="err_log_post_failed">Sembla que el vostre registre no s\'ha publicat. Comproveu-ho a geocaching.com.</string>
-  <string name="err_log_post_failed_ec">Sembla que el registre no s\'ha publicat. Comproveu-ho a Extremcaching.com.</string>
-  <string name="err_logimage_post_failed">Sembla que la  imatge de registre no ha estat guardada. Comproveu-ho a Geocaching.com.</string>
+  <string name="err_log_post_failed">El registre no s\'ha publicat. Comproveu la memòria del lloc web d\'origen.</string>
+  <string name="err_logimage_post_failed">La imatge de registre no s\'ha pujat. Comproveu la memòria del lloc web d\'origen.</string>
   <string name="err_search_address_forgot">El c:geo ha oblidat l\'adreça que intentaves trobar.</string>
   <string name="err_parse_lat">El c:geo no pot calcular la latitud.</string>
   <string name="err_parse_lon">El c:geo no pot calcular la longitud.</string>
@@ -211,6 +210,7 @@
   <string name="loc_net">Xarxa</string>
   <string name="loc_fused">Combinat</string>
   <string name="loc_low_power">Bateria baixa</string>
+  <string name="loc_home">Coordenades de casa</string>
   <string name="loc_gps">GPS</string>
   <string name="loc_sat">Sat</string>
   <string name="loc_trying">Intentant ubicar</string>
@@ -269,9 +269,15 @@
   <string name="caches_nearby">Propers</string>
   <string name="caches_manage">Administra</string>
   <string name="caches_remove_all">Suprimeix-los tots</string>
-  <string name="caches_remove_all_confirm">Voleu suprimir tots els %s catxés de la llista actual?</string>
+  <plurals name="caches_remove_all_confirm">
+    <item quantity="one">Voleu suprimir aquest catxé de la llista actual?</item>
+    <item quantity="other">Voleu suprimir tots els %d catxés de la llista actual?</item>
+  </plurals>
   <string name="caches_remove_selected">Suprimeix els seleccionats</string>
-  <string name="caches_remove_selected_confirm">Voleu suprimir del dispositiu els %s catxés seleccionats?</string>
+  <plurals name="caches_remove_selected_confirm">
+    <item quantity="one">Voleu suprimir aquest catxé del dispositiu?</item>
+    <item quantity="other">Voleu suprimir els %d catxés seleccionats del dispositiu?</item>
+  </plurals>
   <string name="caches_remove_progress">S\'estan eliminant els catxés</string>
   <string name="caches_delete_events">Elimina trobades passades</string>
   <string name="caches_refresh_selected">Actualitza els seleccionats</string>
@@ -296,8 +302,12 @@
   <string name="caches_filter_personal_note">Amb una nota personal</string>
   <string name="caches_filter_popularity">Preferits</string>
   <string name="caches_filter_popularity_ratio">Preferits [%]</string>
+  <string name="caches_filter_personal_data">Amb dades personals</string>
+  <string name="caches_filter_rating">Amb puntuació</string>
+  <string name="caches_filter_own_rating">Amb puntuació pròpia</string>
   <string name="caches_removing_from_history">S\'està eliminant de l\'historial…</string>
   <string name="caches_clear_offlinelogs">Neteja els registres fora de línea</string>
+  <string name="caches_clear_offlinelogs_message">Voleu esborrar els registres fora de línia?</string>
   <string name="caches_clear_offlinelogs_progress">S\'estan netejant els registres fora línia</string>
   <string name="list_menu_create">Crea una llista nova</string>
   <string name="list_menu_drop">Elimina la llista actual</string>
@@ -320,13 +330,16 @@
   <string name="list_not_available">La llista ja no està disponible, s\'està canviant a la llista estàndard</string>
   <string name="about_version">Versió</string>
   <string name="about_changelog">Historial de canvis</string>
+  <string name="about_system">Sistema</string>
   <string name="about_donate">Donatiu</string>
   <string name="about_donation_more">Donatiu\nal desenvolupament</string>
   <string name="about_contributors">Col·laboradors</string>
   <string name="about_license">Llicència</string>
   <string name="about_apache_license"><a href="">Llicència Apache, versió 2.0</a></string>
   <string name="about_help">Ajuda</string>
+  <string name="about_system_include">Si us plau incloure la següent informació de sistema quan envieu un informe d\'error o demanar més informació sobre c:geo:</string>
   <string name="settings_title_services">Serveis</string>
+  <string name="settings_summary_services">Configureu la informació del compte d\'usuari i l\'accés a serveis opcionals.</string>
   <string name="settings_title_appearance">Aparença</string>
   <string name="settings_title_cachedetails">Detalls del catxé</string>
   <string name="settings_title_offlinedata">Dades fora de línia</string>
@@ -373,6 +386,9 @@
   <string name="settings_activate_oc_uk">Activa</string>
   <string name="init_oc_uk_description">Autoritza al c:geo a opencaching.org.uk per buscar catxés i accedir/filtrar els teus catxés trobats.</string>
   <string name="init_gcvote">GCvote.com</string>
+  <string name="init_gcvote_password_description">Per poder puntuar un catxé, cal seguir les instruccions a GCVote.com i introduir aquí la contrasenya del GCVote.</string>
+  <string name="err_gcvote_send_rating">Hi ha un error al enviar la puntuació, comproveu la contrasenya de GCVote a les opcions  o deixeu-ho buit.</string>
+  <string name="gcvote_sent">Votació enviada correctament</string>
   <string name="init_twitter">Twitter</string>
   <string name="settings_activate_twitter">Activa</string>
   <string name="init_username">Nom d\'usuari</string>
@@ -643,7 +659,7 @@
   <string name="cache_menu_streetview">Street View</string>
   <string name="cache_menu_browser">Obre al navegador</string>
   <string name="cache_menu_visit">Registra visita</string>
-  <string name="cache_menu_visit_offline">Registra visita fora de línia</string>
+  <string name="cache_menu_visit_offline">Registra fora de línia amb un sol clic</string>
   <string name="cache_menu_spoilers">Imatges d\'ajuda</string>
   <string name="cache_menu_around">Catxés propers</string>
   <string name="cache_menu_event">Afegeix al calendari</string>
@@ -655,6 +671,7 @@
   <string name="cache_menu_oruxmaps">OruxMaps</string>
   <string name="cache_menu_navigon">Navigon</string>
   <string name="cache_menu_pebble">Pebble</string>
+  <string name="cache_menu_vote">Vota</string>
   <string name="cache_status">Estat</string>
   <string name="cache_status_offline_log">Registre desat</string>
   <string name="cache_status_found">Trobat</string>
@@ -764,6 +781,7 @@
   <string name="search_clear_history">Esborra l\'historial</string>
   <string name="search_history_cleared">S\'ha esborrat l\'historial</string>
   <string name="waypoint_coordinate_formats_plain">Senzill</string>
+  <string name="from_clipboard">Des del porta-retalls</string>
   <string name="visit_tweet">Envia aquest \"trobat\" al Twitter</string>
   <string name="map_map">Mapa</string>
   <string name="map_live">Mapa en viu</string>
@@ -868,6 +886,7 @@
   <string name="helper_contacts_description">Us permet obrir un contacte (de la llibreta de contactes) directament des d\'una entrada del registre, així podeu demanar ajuda als amics més fàcilment.</string>
   <string name="helper_sendtocgeo_description">Send to c:geo és una extensió del navegador <strong>per al vostre ordinador</strong>. Quan navegueu per geocaching.com podreu enviar catxés des del navegador directament al vostre telèfon amb un clic de botó.</string>
   <string name="helper_locus_title">Locus</string>
+  <string name="helper_locus_description">Aplicació de navegació a l\'aire lliure per al vostre telèfon o tauleta. Podeu veure mapes topogràfics fora de línia, seguir una ruta, trobar geocatxés, utilitzar una guia de veu i molt més.</string>
   <string name="helper_gpsstatus_title">Estat del GPS</string>
   <string name="helper_gpsstatus_description">Podeu utilitzar el radar en aquesta aplicació conjuntament amb el c:geo. També ofereix moltes altres informacions relacionades amb el GPS.</string>
   <string name="helper_bluetoothgps_title">GPS Bluetooth</string>
@@ -1170,6 +1189,7 @@
     <item quantity="one">%s preferit</item>
     <item quantity="other">%s preferits</item>
   </plurals>
+  <string name="more_than_percent_favorite_points">&gt; %d%% preferits</string>
   <string name="cgeo_shortcut">Drecera del c:geo</string>
   <string name="create_shortcut">Crea una drecera</string>
   <string name="send">Envia</string>

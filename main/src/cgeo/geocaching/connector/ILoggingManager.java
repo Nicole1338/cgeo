@@ -1,8 +1,10 @@
 package cgeo.geocaching.connector;
 
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.TrackableLog;
 import cgeo.geocaching.enumerations.LogType;
+
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import android.net.Uri;
 
@@ -13,8 +15,7 @@ public interface ILoggingManager {
 
     /**
      * Post a log for a cache online
-     * 
-     * @param cache
+     *
      * @param logType
      * @param date
      * @param log
@@ -23,13 +24,14 @@ public interface ILoggingManager {
      * @param trackableLogs
      * @return
      */
-    LogResult postLog(Geocache cache,
-            LogType logType,
-            Calendar date,
-            String log,
-            String logPassword,
-            List<TrackableLog> trackableLogs);
+    @NonNull
+    LogResult postLog(@NonNull LogType logType,
+            @NonNull Calendar date,
+            @NonNull String log,
+            @Nullable String logPassword,
+            @NonNull List<TrackableLog> trackableLogs);
 
+    @NonNull
     ImageResult postLogImage(String logId,
             String imageCaption,
             String imageDescription,
@@ -37,8 +39,10 @@ public interface ILoggingManager {
 
     public boolean hasLoaderError();
 
+    @NonNull
     public List<TrackableLog> getTrackables();
 
+    @NonNull
     public List<LogType> getPossibleLogTypes();
 
     public void init();

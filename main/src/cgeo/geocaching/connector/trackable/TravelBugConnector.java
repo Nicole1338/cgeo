@@ -20,12 +20,13 @@ public class TravelBugConnector extends AbstractTrackableConnector {
     private final static Pattern PATTERN_TB_CODE = Pattern.compile("(TB[0-9A-Z]+)|([0-9A-Z]{6})", Pattern.CASE_INSENSITIVE);
 
     @Override
-    public boolean canHandleTrackable(String geocode) {
+    public boolean canHandleTrackable(final String geocode) {
         return TravelBugConnector.PATTERN_TB_CODE.matcher(geocode).matches() && !StringUtils.startsWithIgnoreCase(geocode, "GC");
     }
 
     @Override
-    public String getUrl(Trackable trackable) {
+    @NonNull
+    public String getUrl(@NonNull final Trackable trackable) {
         return "http://www.geocaching.com//track/details.aspx?tracker=" + trackable.getGeocode();
     }
 
@@ -35,7 +36,7 @@ public class TravelBugConnector extends AbstractTrackableConnector {
     }
 
     @Override
-    public Trackable searchTrackable(String geocode, String guid, String id) {
+    public Trackable searchTrackable(final String geocode, final String guid, final String id) {
         return GCParser.searchTrackable(geocode, guid, id);
     }
 
@@ -56,15 +57,15 @@ public class TravelBugConnector extends AbstractTrackableConnector {
 
     @Override
     public @Nullable
-    String getTrackableCodeFromUrl(@NonNull String url) {
+    String getTrackableCodeFromUrl(@NonNull final String url) {
         // coord.info URLs
-        String code = StringUtils.substringAfterLast(url, "coord.info/");
-        if (code != null && canHandleTrackable(code)) {
-            return code;
+        final String code1 = StringUtils.substringAfterLast(url, "coord.info/");
+        if (canHandleTrackable(code1)) {
+            return code1;
         }
-        code = StringUtils.substringAfterLast(url, "?tracker=");
-        if (code != null && canHandleTrackable(code)) {
-            return code;
+        final String code2 = StringUtils.substringAfterLast(url, "?tracker=");
+        if (canHandleTrackable(code2)) {
+            return code2;
         }
         return null;
     }

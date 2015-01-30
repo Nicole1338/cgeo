@@ -6,7 +6,9 @@ import cgeo.geocaching.connector.gc.GCLogin;
 import cgeo.geocaching.enumerations.CacheSize;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.enumerations.LogType;
-import cgeo.geocaching.geopoint.Geopoint;
+import cgeo.geocaching.location.Geopoint;
+
+import org.eclipse.jdt.annotation.NonNull;
 
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -56,11 +58,13 @@ public class GC2JVEH extends MockedCache {
         return "indianerjones, der merlyn,reflektordetektor";
     }
 
+    @NonNull
     @Override
     public String getOwnerUserId() {
         return "indianerjones";
     }
 
+    @NonNull
     @Override
     public CacheSize getSize() {
         return CacheSize.SMALL;
@@ -96,6 +100,7 @@ public class GC2JVEH extends MockedCache {
         return null;
     }
 
+    @NonNull
     @Override
     public List<String> getAttributes() {
         final String[] attributes = new String[] {

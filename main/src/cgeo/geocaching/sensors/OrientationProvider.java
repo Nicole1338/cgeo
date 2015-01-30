@@ -27,6 +27,11 @@ public class OrientationProvider extends LooperCallbacks<Float> implements Senso
         }
     }
 
+    @SuppressWarnings("deprecation")
+    public static boolean hasOrientationSensor(final Context context) {
+        return ((SensorManager) context.getSystemService(Context.SENSOR_SERVICE)).getDefaultSensor(Sensor.TYPE_ORIENTATION) != null;
+    }
+
     @Override
     public void onSensorChanged(final SensorEvent event) {
             subject.onNext(event.values[0]);
@@ -61,7 +66,7 @@ public class OrientationProvider extends LooperCallbacks<Float> implements Senso
     }
 
     public static Observable<Float> create(final Context context) {
-        return Observable.create(new OrientationProvider(context));
+        return Observable.create(new OrientationProvider(context)).onBackpressureDrop();
     }
 
 }

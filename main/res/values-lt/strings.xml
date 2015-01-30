@@ -74,7 +74,7 @@
   <string name="log_tb_visit">Apsilankė</string>
   <string name="log_tb_drop">Paliktas</string>
   <string name="log_tb_changeall">Keisti visus</string>
-  <string name="log_save">Išsaugoti</string>
+  <string name="log_save">Išsaugoti neprisijungus</string>
   <string name="log_saving">Siunčiamas įrašas…</string>
   <string name="log_saving_and_uploading">Siunčiamas įrašas ir įkeliama nuotrauka…</string>
   <string name="log_clear">Išvalyti</string>
@@ -125,6 +125,7 @@
   <string name="err_login">Nėra išsaugotos prisijungimo informacijos</string>
   <string name="err_login_failed_toast">c:geo negali prisijungti. c:geo veikia neprisijungusi su išsaugotomis slėptuvėmis. Patikrinkite prisijungimo nustatymus arba įjunkite prietaiso interneto ryšį.</string>
   <string name="err_unknown">Nežinoma klaida</string>
+  <string name="err_unknown_address">C:geo nepavyko susieti šio adreso su egzistuojančia vietove</string>
   <string name="err_comm">Nežinoma ryšio klaida</string>
   <string name="err_missing_auth">Neįvestas vartotojo vardas ir/ar slaptažodis.</string>
   <string name="err_wrong">Neteisinga prisijungimo informacija</string>
@@ -159,7 +160,6 @@
   <string name="err_acquire_image_failed">Nepavyko pasiekti nuotraukos.</string>
   <string name="err_tb_display">c:geo negali parodyti norimo keliauninko. Ar tai tikrai keliauninkas?</string>
   <string name="err_tb_details_open">c:geo negali atidaryti keliauninko informacijos.</string>
-  <string name="err_tb_forgot_saw">c:geo pamiršo kokį keliauninką žiūrėjote.</string>
   <string name="err_tb_find">c:geo neranda keliauninko</string>
   <string name="err_tb_find_that">c:geo neranda šito keliauninko.</string>
   <string name="err_waypoint_cache_unknown">c:geo nežino, kokiai slėptuvei norite pridėti papildomą tašką.</string>
@@ -167,15 +167,13 @@
   <string name="err_point_unknown_position">c:geo neranda Jūsų buvimo vietos.</string>
   <string name="err_point_no_position_given_title">Reikalinga informacija</string>
   <string name="err_point_no_position_given">Užpildykite bent platumą ir ilgumą arba atstumą ir azimutą. Taip pat galite užpildyt ir visus keturis laukelius.</string>
-  <string name="err_point_curr_position_unavailable">c:geo dar negavo vietos koordinačių. Prašome palaukti…</string>
   <string name="err_point_bear_and_dist_title">Reikalinga pagalba?</string>
   <string name="err_point_bear_and_dist">Užpildykite azimutą ir atstumą. Azimutas tai nuo 0 iki 360 laipsnių kampas nuo šiaurės. Atstumas nereikalauja matavimo vienetų.</string>
   <string name="err_log_load_data">c:geo negali įkelti duomenų reikalingų apsilankymui įrašyti.</string>
   <string name="err_log_load_data_again">c:geo negali įkelti duomenų reikalingų apsilankymui įrašyti. Bando dar kartą.</string>
   <string name="err_log_load_data_still">c:geo dar įkelia duomenis reikalingus apsilankymui įrašyti. Prašome palaukti šiek tiek ilgiau.</string>
-  <string name="err_log_post_failed">Atrodo, kad jūsų įrašas nebuvo paskelbtas. Prašome tai patikrinti Geocaching.com.</string>
-  <string name="err_log_post_failed_ec">Atrodo, kad jūsų įrašas nebuvo paskelbtas. Prašome tai patikrinti Extremcaching.com.</string>
-  <string name="err_logimage_post_failed">Atrodo, kad jūsų įrašo nuotrauka nebuvo įkelta. Prašome tai patikrinti Geocaching.com.</string>
+  <string name="err_log_post_failed">Atrodo, kad jūsų įrašas nebuvo paskelbtas. Prašome patikrinti jį slėptuvės svetainėje.</string>
+  <string name="err_logimage_post_failed">Atrodo, kad jūsų įrašo nuotrauka nebuvo paskelbta. Prašome patikrinti ją slėptuvės svetainėje.</string>
   <string name="err_search_address_forgot">c:geo pamiršo adresą kurio bandėte ieškoti.</string>
   <string name="err_parse_lat">c:geo nesupranta įvestos platumos.</string>
   <string name="err_parse_lon">c:geo nesupranta įvestos ilgumos.</string>
@@ -212,6 +210,7 @@
   <string name="loc_net">Tinklas</string>
   <string name="loc_fused">Sujungta</string>
   <string name="loc_low_power">Energijos taupymas</string>
+  <string name="loc_home">Namų koordinatės</string>
   <string name="loc_gps">GPS</string>
   <string name="loc_sat">Pal.</string>
   <string name="loc_trying">Bandoma nustatyti</string>
@@ -271,9 +270,17 @@
   <string name="caches_nearby">Netoliese</string>
   <string name="caches_manage">Valdyti</string>
   <string name="caches_remove_all">Pašalinti visas</string>
-  <string name="caches_remove_all_confirm">Ar norite pašalinti visas %s slėptuves iš dabartinio sąrašo?</string>
+  <plurals name="caches_remove_all_confirm">
+    <item quantity="one">Ar norite pašalinti slėptuvę iš dabartinio sąrašo?</item>
+    <item quantity="few">Ar norite pašalinti visas %d slėptuves iš dabartinio sąrašo?</item>
+    <item quantity="other">Ar norite pašalinti visas %d slėptuvių iš dabartinio sąrašo?</item>
+  </plurals>
   <string name="caches_remove_selected">Pašalinti pasirinktą</string>
-  <string name="caches_remove_selected_confirm">Ar norite pašalinti pasirinktas %s slėptuves iš prietaiso?</string>
+  <plurals name="caches_remove_selected_confirm">
+    <item quantity="one">Ar norite pašalinti slėptuvę iš prietaiso?</item>
+    <item quantity="few">Ar norite pašalinti pasirinktas %d slėptuves iš prietaiso?</item>
+    <item quantity="other">Ar norite pašalinti pasirinktas %d slėptuvių iš prietaiso?</item>
+  </plurals>
   <string name="caches_remove_progress">Pašalinamos slėptuvės</string>
   <string name="caches_delete_events">Ištrinti praeities įvykius</string>
   <string name="caches_refresh_selected">Atnaujinti pasirinktas</string>
@@ -298,6 +305,9 @@
   <string name="caches_filter_personal_note">Su asmenine pastaba</string>
   <string name="caches_filter_popularity">Kaip mėgiamos</string>
   <string name="caches_filter_popularity_ratio">Kaip mėgiamos [%]</string>
+  <string name="caches_filter_personal_data">Su asmeniniais duomenimis</string>
+  <string name="caches_filter_rating">Su reitingu</string>
+  <string name="caches_filter_own_rating">Su savo reitingu</string>
   <string name="caches_removing_from_history">Pašalinama iš Istorijos…</string>
   <string name="caches_clear_offlinelogs">Išvalyti išsaugotus įrašus</string>
   <string name="caches_clear_offlinelogs_message">Ar norite išvalyti išsaugotus įrašus?</string>
@@ -323,13 +333,16 @@
   <string name="list_not_available">Sąrašas nebeprieinamas, pereinama į standartinį sąrašą</string>
   <string name="about_version">Versija</string>
   <string name="about_changelog">Pakeitimų žurnalas</string>
+  <string name="about_system">Sistema</string>
   <string name="about_donate">Paaukoti</string>
   <string name="about_donation_more">Paaukoti\nkūrėjams</string>
   <string name="about_contributors">Bendraautoriai</string>
   <string name="about_license">Licencija</string>
   <string name="about_apache_license"><a href=""> Apache licencija, versija 2.0</a></string>
   <string name="about_help">Pagalba</string>
+  <string name="about_system_include">Pridėkite papildomą sisteminę informaciją, kai siunčiate klaidos pranešimą arba norite gauti daugiau informacijos apie c:geo:</string>
   <string name="settings_title_services">Paslaugos</string>
+  <string name="settings_summary_services">Nustatyk naudotojo paskyros informaciją ir prieiga prie pasirinktinų paslaugų.</string>
   <string name="settings_title_appearance">Išvaizda</string>
   <string name="settings_title_cachedetails">Slėptuvės informacija</string>
   <string name="settings_title_offlinedata">Duomenys darbui neprisijungus</string>
@@ -367,6 +380,9 @@
   <string name="settings_activate_oc_uk">Aktyvuoti</string>
   <string name="init_oc_uk_description">Leiskite c:geo prisijungti prie opencaching.org.uk tam, kad galėtumėt ieškoti slėptuvių ir pasiekti/filtruoti rastas slėptuves.</string>
   <string name="init_gcvote">GCvote.com</string>
+  <string name="init_gcvote_password_description">Kad būtų galima reitinguoti slėptuvę, sekite instrukciją GCVote.com svetainėje ir čia  įveskite GCVote slaptažodį.</string>
+  <string name="err_gcvote_send_rating">Klaida siunčiant reitingą, patikrinkite GCVote slaptažodį parametruose arba jį ištrinkite.</string>
+  <string name="gcvote_sent">Balsas sėkmingai išsiųstas</string>
   <string name="init_twitter">Twitter</string>
   <string name="settings_activate_twitter">Aktyvuoti</string>
   <string name="init_username">Vartotojo vardas</string>
@@ -634,7 +650,7 @@
   <string name="cache_menu_streetview">Street View</string>
   <string name="cache_menu_browser">Atidaryti naršyklėje</string>
   <string name="cache_menu_visit">Registruoti</string>
-  <string name="cache_menu_visit_offline">Registruoti neprisijungus</string>
+  <string name="cache_menu_visit_offline">Vienu paspaudimu žurnalo įrašo išsaugojimas</string>
   <string name="cache_menu_spoilers">Užuominų nuotraukos</string>
   <string name="cache_menu_around">Slėptuvės aplink</string>
   <string name="cache_menu_event">Įtraukti į kalendorių</string>
@@ -645,6 +661,7 @@
   <string name="cache_menu_whereyougo">WhereYouGo</string>
   <string name="cache_menu_oruxmaps">OruxMaps</string>
   <string name="cache_menu_pebble">Pebble</string>
+  <string name="cache_menu_vote">Balsuoti</string>
   <string name="cache_status">Būsena</string>
   <string name="cache_status_offline_log">Išsaugotas įrašas</string>
   <string name="cache_status_found">Rasta</string>

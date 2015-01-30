@@ -3,7 +3,6 @@ package cgeo.test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import cgeo.geocaching.Geocache;
-import cgeo.geocaching.ICache;
 import cgeo.geocaching.enumerations.LogType;
 import cgeo.geocaching.utils.CryptUtils;
 
@@ -13,7 +12,7 @@ import java.util.Date;
 
 public abstract class Compare {
 
-    public static void assertCompareCaches(ICache expected, Geocache actual, boolean all) {
+    public static void assertCompareCaches(final Geocache expected, final Geocache actual, final boolean all) {
         final String geocode = expected.getGeocode();
         final String cacheStr = "Cache " + geocode + ": ";
         assertThat(actual).isNotNull();
@@ -31,7 +30,7 @@ public abstract class Compare {
         final Date hiddenDate = actual.getHiddenDate();
         assertThat(hiddenDate).isNotNull();
         assert hiddenDate != null; // silence the eclipse compiler in the next line
-        assertThat(hiddenDate.toString()).as(cacheStr + "hidden date").isEqualTo(expected.getHiddenDate().toString());
+        assertThat(hiddenDate).as(cacheStr + " hidden date").isEqualTo(expected.getHiddenDate());
         assertThat(actual.isPremiumMembersOnly()).as(cacheStr + "premium only").isEqualTo(expected.isPremiumMembersOnly());
 
         if (all) {
@@ -48,18 +47,18 @@ public abstract class Compare {
             assertThat(actual.isFavorite()).as(cacheStr + "favorite status").isEqualTo(expected.isFavorite());
             assertThat(actual.isOnWatchlist()).as(cacheStr + "watchlist status").isEqualTo(expected.isOnWatchlist());
 
-            for (String attribute : expected.getAttributes()) {
+            for (final String attribute : expected.getAttributes()) {
                 assertThat(actual.getAttributes()).as("attributes of " + actual.getGeocode()).contains(attribute);
             }
-            for (LogType logType : expected.getLogCounts().keySet()) {
+            for (final LogType logType : expected.getLogCounts().keySet()) {
                 assertThat(actual.getLogCounts().get(logType)).as("logcount of " + geocode + " for type " + logType.toString()).isGreaterThanOrEqualTo(expected.getLogCounts().get(logType));
             }
 
             // The inventories can differ too often, therefore we don't compare them. Also, the personal note
             // cannot be expected to match with different tester accounts.
 
-            final int actualSpoilersSize = null != actual.getSpoilers() ? actual.getSpoilers().size() : 0;
-            final int expectedSpoilersSize = null != expected.getSpoilers() ? expected.getSpoilers().size() : 0;
+            final int actualSpoilersSize = actual.getSpoilers().size();
+            final int expectedSpoilersSize = expected.getSpoilers().size();
             assertThat(actualSpoilersSize).as(cacheStr + "spoiler count").isEqualTo(expectedSpoilersSize);
         }
     }

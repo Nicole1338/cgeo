@@ -1,13 +1,14 @@
 package cgeo.geocaching;
 
 import butterknife.ButterKnife;
+import butterknife.InjectView;
 
 import cgeo.geocaching.network.StatusUpdater;
 import cgeo.geocaching.network.StatusUpdater.Status;
 import cgeo.geocaching.utils.Log;
 
 import rx.Subscription;
-import rx.android.observables.AndroidObservable;
+import rx.android.app.AppObservable;
 import rx.functions.Action1;
 import rx.subscriptions.Subscriptions;
 
@@ -25,15 +26,17 @@ import android.widget.TextView;
 
 public class StatusFragment extends Fragment {
 
+    protected @InjectView(R.id.status_icon) ImageView statusIcon;
+    protected @InjectView(R.id.status_message) TextView statusMessage;
+
     private Subscription statusSubscription = Subscriptions.empty();
 
     @Override
     public View onCreateView(final LayoutInflater inflater, final ViewGroup container, final Bundle savedInstanceState) {
         super.onCreateView(inflater, container, savedInstanceState);
         final ViewGroup statusGroup = (ViewGroup) inflater.inflate(R.layout.status, container, false);
-        final ImageView statusIcon = ButterKnife.findById(statusGroup, R.id.status_icon);
-        final TextView statusMessage = ButterKnife.findById(statusGroup, R.id.status_message);
-        statusSubscription = AndroidObservable.bindFragment(this, StatusUpdater.latestStatus)
+        ButterKnife.inject(this, statusGroup);
+        statusSubscription = AppObservable.bindFragment(this, StatusUpdater.latestStatus)
                 .subscribe(new Action1<Status>() {
                     @Override
                     public void call(final Status status) {
@@ -88,6 +91,7 @@ public class StatusFragment extends Fragment {
     public void onDestroyView() {
         statusSubscription.unsubscribe();
         super.onDestroyView();
+        ButterKnife.reset(this);
     }
 
 }

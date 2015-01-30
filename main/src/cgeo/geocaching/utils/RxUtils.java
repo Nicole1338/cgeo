@@ -8,21 +8,28 @@ import rx.Scheduler.Worker;
 import rx.Subscriber;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action0;
+import rx.functions.Action1;
+import rx.functions.Func0;
 import rx.functions.Func1;
+import rx.internal.util.RxThreadFactory;
 import rx.observables.BlockingObservable;
 import rx.observers.Subscribers;
 import rx.schedulers.Schedulers;
 import rx.subjects.PublishSubject;
 import rx.subscriptions.Subscriptions;
+import rx.util.async.Async;
 
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.Process;
 
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class RxUtils {
 
@@ -32,10 +39,12 @@ public class RxUtils {
 
     public final static Scheduler computationScheduler = Schedulers.computation();
 
-    public static final Scheduler networkScheduler = Schedulers.from(new ThreadPoolExecutor(10, 10, 5, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>()));
+    public static final Scheduler networkScheduler = Schedulers.from(Executors.newFixedThreadPool(10, new RxThreadFactory("network-")));
+
+    public static final Scheduler refreshScheduler = Schedulers.from(Executors.newFixedThreadPool(3, new RxThreadFactory("refresh-")));
 
     private static final HandlerThread looperCallbacksThread =
-            new HandlerThread("Looper callbacks thread", android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            new HandlerThread("looper callbacks", Process.THREAD_PRIORITY_DEFAULT);
 
     static {
         looperCallbacksThread.start();
@@ -121,18 +130,18 @@ public class RxUtils {
                     }
 
                     @Override
-                    public void onError(final Throwable e) {
+                    public void onError(final Throwable throwable) {
                         if (!done) {
-                            subscriber.onError(e);
+                            subscriber.onError(throwable);
                         }
                     }
 
                     @Override
-                    public void onNext(final T t) {
-                        subscriber.onNext(t);
+                    public void onNext(final T value) {
+                        subscriber.onNext(value);
                         boolean shouldEnd = false;
                         try {
-                            shouldEnd = predicate.call(t);
+                            shouldEnd = predicate.call(value);
                         } catch (final Throwable e) {
                             done = true;
                             subscriber.onError(e);
@@ -147,6 +156,81 @@ public class RxUtils {
                 };
             }
         };
+    }
+
+    public static<T> Observable<T> rememberLast(final Observable<T> observable, final T initialValue) {
+        final AtomicReference<T> lastValue = new AtomicReference<>(initialValue);
+        return observable.doOnNext(new Action1<T>() {
+            @Override
+            public void call(final T value) {
+                lastValue.set(value);
+            }
+        }).startWith(Observable.defer(new Func0<Observable<T>>() {
+            @Override
+            public Observable<T> call() {
+                final T last = lastValue.get();
+                return last != null ? Observable.just(last) : Observable.<T>empty();
+            }
+        })).replay(1).refCount();
+    }
+
+    public static <T> void andThenOnUi(final Scheduler scheduler, final Func0<T> background, final Action1<T> foreground) {
+        Async.fromCallable(background, scheduler).observeOn(AndroidSchedulers.mainThread()).subscribe(foreground);
+    }
+
+    public static void andThenOnUi(final Scheduler scheduler, final Action0 background, final Action0 foreground) {
+        andThenOnUi(scheduler, new Func0<Void>() {
+            @Override
+            public Void call() {
+                background.call();
+                return null;
+            }
+        }, new Action1<Void>() {
+            @Override
+            public void call(final Void ignored) {
+                foreground.call();
+            }
+        });
+    }
+
+    /**
+     * Cache the last value of observables so that every key is associated to only one of them.
+     *
+     * @param <K> the type of the key
+     * @param <V> the type of the value
+     */
+    public static class ObservableCache<K, V> {
+
+        final private Func1<K, Observable<V>> func;
+        final private Map<K, Observable<V>> cached = new HashMap<>();
+
+        /**
+         * Create a new observables cache.
+         *
+         * @param func the function transforming a key into an observable
+         */
+        public ObservableCache(final Func1<K, Observable<V>> func) {
+            this.func = func;
+        }
+
+        /**
+         * Get the observable corresponding to a key. If the key has not already been
+         * seen, the function passed to the constructor will be called to build the observable
+         * <p/>
+         * If the observable has already emitted values, only the last one will be remembered.
+         *
+         * @param key the key
+         * @return the observable corresponding to the key
+         */
+        public synchronized Observable<V> get(final K key) {
+            if (cached.containsKey(key)) {
+                return cached.get(key);
+            }
+            final Observable<V> value = func.call(key).replay(1).refCount();
+            cached.put(key, value);
+            return value;
+        }
+
     }
 
 }

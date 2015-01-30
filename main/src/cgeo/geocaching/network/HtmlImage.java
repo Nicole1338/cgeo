@@ -12,13 +12,13 @@ import cgeo.geocaching.utils.ImageUtils;
 import cgeo.geocaching.utils.ImageUtils.ContainerDrawable;
 import cgeo.geocaching.utils.Log;
 import cgeo.geocaching.utils.RxUtils;
+import cgeo.geocaching.utils.RxUtils.ObservableCache;
 
 import ch.boye.httpclientandroidlib.HttpResponse;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -44,22 +44,14 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * All-purpose image getter that can also be used as a ImageGetter interface when displaying caches.
+ */
 
 public class HtmlImage implements Html.ImageGetter {
-
-    // This class implements an all-purpose image getter that can also be used as a ImageGetter interface
-    // when displaying caches. An instance mainly has three possible use cases:
-    //  - If onlySave is true, getDrawable() will return null immediately and will queue the image retrieval
-    //    and saving in the loading subject. Downloads will start in parallel when the blocking
-    //    waitForBackgroundLoading() method is called, and they can be cancelled through the given handler.
-    //  - If onlySave is false and the instance is called through fetchDrawable(), then an observable for the
-    //    given URL will be returned. This observable will emit the local copy of the image if it is present,
-    //    regardless of its freshness, then if needed an updated fresher copy after retrieving it from the network.
-    //  - If onlySave is false and the instance is used as an ImageGetter, only the final version of the
-    //    image will be returned, unless a view has been provided. If it has, then a dummy drawable is returned
-    //    and is updated when the image is available, possibly several times if we had a stale copy of the image
-    //    and then got a new one from the network.
 
     private static final String[] BLOCKED = new String[] {
             "gccounter.de",
@@ -79,9 +71,9 @@ public class HtmlImage implements Html.ImageGetter {
     };
     public static final String SHARED = "shared";
 
-    final private String geocode;
+    @NonNull final private String geocode;
     /**
-     * on error: return large error image, if <code>true</code>, otherwise empty 1x1 image
+     * on error: return large error image, if {@code true}, otherwise empty 1x1 image
      */
     final private boolean returnErrorImage;
     final private int listId;
@@ -90,24 +82,56 @@ public class HtmlImage implements Html.ImageGetter {
     final private int maxHeight;
     final private Resources resources;
     protected final TextView view;
+    final private Map<String, BitmapDrawable> cache = new HashMap<>();
+
+    final private ObservableCache<String, BitmapDrawable> observableCache = new ObservableCache<>(new Func1<String, Observable<BitmapDrawable>>() {
+        @Override
+        public Observable<BitmapDrawable> call(final String url) {
+            return fetchDrawableUncached(url);
+        }
+    });
 
     // Background loading
     final private PublishSubject<Observable<String>> loading = PublishSubject.create();
-    final private Observable<String> waitForEnd = Observable.merge(loading).publish().refCount();
-    final CompositeSubscription subscription = new CompositeSubscription(waitForEnd.subscribe());
+    final private Observable<String> waitForEnd = Observable.merge(loading).cache();
+    final private CompositeSubscription subscription = new CompositeSubscription(waitForEnd.subscribe());
 
     /**
-     * Create a new HtmlImage object with different behaviours depending on <tt>onlySave</tt> and <tt>view</tt> values.
+     * Create a new HtmlImage object with different behaviors depending on <tt>onlySave</tt> and <tt>view</tt> values.
+     * There are the three possible use cases:
+     * <ul>
+     * <li>If onlySave is true, {@link #getDrawable(String)} will return <tt>null</tt> immediately and will queue the
+     * image retrieval and saving in the loading subject. Downloads will start in parallel when the blocking
+     * {@link #waitForEndObservable(cgeo.geocaching.utils.CancellableHandler)} method is called, and they can be
+     * cancelled through the given handler.</li>
+     * <li>If <tt>onlySave</tt> is <tt>false</tt> and the instance is called through {@link #fetchDrawable(String)},
+     * then an observable for the given URL will be returned. This observable will emit the local copy of the image if
+     * it is present regardless of its freshness, then if needed an updated fresher copy after retrieving it from the
+     * network.</li>
+     * <li>If <tt>onlySave</tt> is <tt>false</tt> and the instance is used as an {@link android.text.Html.ImageGetter},
+     * only the final version of the image will be returned, unless a view has been provided. If it has, then a dummy
+     * drawable is returned and is updated when the image is available, possibly several times if we had a stale copy of
+     * the image and then got a new one from the network.</li>
+     * </ul>
      *
-     * @param geocode the geocode of the item for which we are requesting the image
-     * @param returnErrorImage set to <tt>true</tt> if an error image should be returned in case of a problem,
-     *                         <tt>false</tt> to get a transparent 1x1 image instead
-     * @param listId the list this cache belongs to, used to determine if an older image for the offline case can be used or not
-     * @param onlySave if set to <tt>true</tt>, {@link #getDrawable(String)} will only fetch and store the image, not return it
-     * @param view if non-null, {@link #getDrawable(String)} will return an initially empty drawable which will be redrawn when
-     *             the image is ready through an invalidation of the given view
+     * @param geocode
+     *            the geocode of the item for which we are requesting the image, or {@link #SHARED} to use the shared
+     *            cache directory
+     * @param returnErrorImage
+     *            set to <tt>true</tt> if an error image should be returned in case of a problem, <tt>false</tt> to get
+     *            a transparent 1x1 image instead
+     * @param listId
+     *            the list this cache belongs to, used to determine if an older image for the offline case can be used
+     *            or not
+     * @param onlySave
+     *            if set to <tt>true</tt>, {@link #getDrawable(String)} will only fetch and store the image, not return
+     *            it
+     * @param view
+     *            if non-null, {@link #getDrawable(String)} will return an initially empty drawable which will be
+     *            redrawn when
+     *            the image is ready through an invalidation of the given view
      */
-    public HtmlImage(final String geocode, final boolean returnErrorImage, final int listId, final boolean onlySave, final TextView view) {
+    public HtmlImage(@NonNull final String geocode, final boolean returnErrorImage, final int listId, final boolean onlySave, final TextView view) {
         this.geocode = geocode;
         this.returnErrorImage = returnErrorImage;
         this.listId = listId;
@@ -121,12 +145,12 @@ public class HtmlImage implements Html.ImageGetter {
     }
 
     /**
-     * Create a new HtmlImage object with different behaviours depending on <tt>onlySave</tt> value. No view object
+     * Create a new HtmlImage object with different behaviors depending on <tt>onlySave</tt> value. No view object
      * will be tied to this HtmlImage.
      *
      * For documentation, see {@link #HtmlImage(String, boolean, int, boolean, TextView)}.
      */
-    public HtmlImage(final String geocode, final boolean returnErrorImage, final int listId, final boolean onlySave) {
+    public HtmlImage(@NonNull final String geocode, final boolean returnErrorImage, final int listId, final boolean onlySave) {
         this(geocode, returnErrorImage, listId, onlySave, null);
     }
 
@@ -141,6 +165,9 @@ public class HtmlImage implements Html.ImageGetter {
     @Nullable
     @Override
     public BitmapDrawable getDrawable(final String url) {
+        if (cache.containsKey(url)) {
+            return cache.get(url);
+        }
         final Observable<BitmapDrawable> drawable = fetchDrawable(url);
         if (onlySave) {
             loading.onNext(drawable.map(new Func1<BitmapDrawable, String>() {
@@ -149,22 +176,25 @@ public class HtmlImage implements Html.ImageGetter {
                     return url;
                 }
             }));
+            cache.put(url, null);
             return null;
         }
-        if (view == null) {
-            return drawable.toBlocking().lastOrDefault(null);
-        }
-        return getContainerDrawable(drawable);
+        final BitmapDrawable result = view == null ? drawable.toBlocking().lastOrDefault(null) : getContainerDrawable(drawable);
+        cache.put(url, result);
+        return result;
     }
 
     protected BitmapDrawable getContainerDrawable(final Observable<BitmapDrawable> drawable) {
         return new ContainerDrawable(view, drawable);
     }
 
+    public Observable<BitmapDrawable> fetchDrawable(final String url) {
+        return observableCache.get(url);
+    }
+
     // Caches are loaded from disk on a computation scheduler to avoid using more threads than cores while decoding
     // the image. Downloads happen on downloadScheduler, in parallel with image decoding.
-    public Observable<BitmapDrawable> fetchDrawable(final String url) {
-
+    private Observable<BitmapDrawable> fetchDrawableUncached(final String url) {
         if (StringUtils.isBlank(url) || ImageUtils.containsPattern(url, BLOCKED)) {
             return Observable.just(ImageUtils.getTransparent1x1Drawable(resources));
         }
@@ -175,7 +205,7 @@ public class HtmlImage implements Html.ImageGetter {
             return Observable.defer(new Func0<Observable<BitmapDrawable>>() {
                 @Override
                 public Observable<BitmapDrawable> call() {
-                    final Bitmap bitmap = loadCachedImage(FileUtils.urlToFile(url), true).getLeft();
+                    final Bitmap bitmap = loadCachedImage(FileUtils.urlToFile(url), true).left;
                     return bitmap != null ? Observable.just(ImageUtils.scaleBitmapToFitDisplay(bitmap)) : Observable.<BitmapDrawable>empty();
                 }
             }).subscribeOn(RxUtils.computationScheduler);
@@ -191,9 +221,9 @@ public class HtmlImage implements Html.ImageGetter {
                 subscriber.add(RxUtils.computationScheduler.createWorker().schedule(new Action0() {
                     @Override
                     public void call() {
-                        final Pair<BitmapDrawable, Boolean> loaded = loadFromDisk();
-                        final BitmapDrawable bitmap = loaded.getLeft();
-                        if (loaded.getRight()) {
+                        final ImmutablePair<BitmapDrawable, Boolean> loaded = loadFromDisk();
+                        final BitmapDrawable bitmap = loaded.left;
+                        if (loaded.right) {
                             subscriber.onNext(bitmap);
                             subscriber.onCompleted();
                             return;
@@ -210,8 +240,8 @@ public class HtmlImage implements Html.ImageGetter {
                 }));
             }
 
-            private Pair<BitmapDrawable, Boolean> loadFromDisk() {
-                final Pair<Bitmap, Boolean> loadResult = loadImageFromStorage(url, pseudoGeocode, shared);
+            private ImmutablePair<BitmapDrawable, Boolean> loadFromDisk() {
+                final ImmutablePair<Bitmap, Boolean> loadResult = loadImageFromStorage(url, pseudoGeocode, shared);
                 return scaleImage(loadResult);
             }
 
@@ -232,34 +262,31 @@ public class HtmlImage implements Html.ImageGetter {
                 }
                 if (onlySave) {
                     subscriber.onCompleted();
-                } else {
-                    RxUtils.computationScheduler.createWorker().schedule(new Action0() {
-                        @Override
-                        public void call() {
-                            final Pair<BitmapDrawable, Boolean> loaded = loadFromDisk();
-                            final BitmapDrawable image = loaded.getLeft();
-                            if (image != null) {
-                                subscriber.onNext(image);
-                            } else {
-                                subscriber.onNext(returnErrorImage ?
-                                        new BitmapDrawable(resources, BitmapFactory.decodeResource(resources, R.drawable.image_not_loaded)) :
-                                        ImageUtils.getTransparent1x1Drawable(resources));
-                            }
-                            subscriber.onCompleted();
-                        }
-                    });
+                    return;
                 }
+                RxUtils.computationScheduler.createWorker().schedule(new Action0() {
+                    @Override
+                    public void call() {
+                        final ImmutablePair<BitmapDrawable, Boolean> loaded = loadFromDisk();
+                        final BitmapDrawable image = loaded.left;
+                        if (image != null) {
+                            subscriber.onNext(image);
+                        } else {
+                            subscriber.onNext(returnErrorImage ?
+                                    new BitmapDrawable(resources, BitmapFactory.decodeResource(resources, R.drawable.image_not_loaded)) :
+                                    ImageUtils.getTransparent1x1Drawable(resources));
+                        }
+                        subscriber.onCompleted();
+                    }
+                });
             }
         });
     }
 
     @SuppressWarnings("static-method")
-    protected Pair<BitmapDrawable, Boolean> scaleImage(final Pair<Bitmap, Boolean> loadResult) {
-        final Bitmap bitmap = loadResult.getLeft();
-        return new ImmutablePair<>(bitmap != null ?
-                ImageUtils.scaleBitmapToFitDisplay(bitmap) :
-                null,
-                loadResult.getRight());
+    protected ImmutablePair<BitmapDrawable, Boolean> scaleImage(final ImmutablePair<Bitmap, Boolean> loadResult) {
+        final Bitmap bitmap = loadResult.left;
+        return ImmutablePair.of(bitmap != null ? ImageUtils.scaleBitmapToFitDisplay(bitmap) : null, loadResult.right);
     }
 
     public Observable<String> waitForEndObservable(@Nullable final CancellableHandler handler) {
@@ -327,14 +354,14 @@ public class HtmlImage implements Html.ImageGetter {
      * @param url the image URL
      * @param pseudoGeocode the geocode or the shared name
      * @param forceKeep keep the image if it is there, without checking its freshness
-     * @return <code>true</code> if the image was there and is fresh enough, <code>false</code> otherwise
+     * @return A pair whose first element is the bitmap if available, and the second one is <code>true</code> if the image is present and fresh enough.
      */
     @NonNull
-    private Pair<Bitmap, Boolean> loadImageFromStorage(final String url, final String pseudoGeocode, final boolean forceKeep) {
+    private ImmutablePair<Bitmap, Boolean> loadImageFromStorage(final String url, @NonNull final String pseudoGeocode, final boolean forceKeep) {
         try {
             final File file = LocalStorage.getStorageFile(pseudoGeocode, url, true, false);
-            final Pair<Bitmap, Boolean> image = loadCachedImage(file, forceKeep);
-            if (image.getRight() || image.getLeft() != null) {
+            final ImmutablePair<Bitmap, Boolean> image = loadCachedImage(file, forceKeep);
+            if (image.right || image.left != null) {
                 return image;
             }
             final File fileSec = LocalStorage.getStorageSecFile(pseudoGeocode, url, true);
@@ -342,7 +369,7 @@ public class HtmlImage implements Html.ImageGetter {
         } catch (final Exception e) {
             Log.w("HtmlImage.loadImageFromStorage", e);
         }
-        return new ImmutablePair<>(null, false);
+        return ImmutablePair.of((Bitmap) null, false);
     }
 
     @Nullable
@@ -374,17 +401,17 @@ public class HtmlImage implements Html.ImageGetter {
      *
      * @param file the file on disk
      * @param forceKeep keep the image if it is there, without checking its freshness
-     * @return a pair with <code>true</code> if the image was there and is fresh enough or <code>false</code> otherwise,
-     *         and the image (possibly <code>null</code> if the first component is <code>false</code> and the image
-     *         could not be loaded, or if the first component is <code>true</code> and <code>onlySave</code> is also
+     * @return a pair with <code>true</code> in the second component if the image was there and is fresh enough or <code>false</code> otherwise,
+     *         and the image (possibly <code>null</code> if the second component is <code>false</code> and the image
+     *         could not be loaded, or if the second component is <code>true</code> and <code>onlySave</code> is also
      *         <code>true</code>)
      */
     @NonNull
-    private Pair<Bitmap, Boolean> loadCachedImage(final File file, final boolean forceKeep) {
+    private ImmutablePair<Bitmap, Boolean> loadCachedImage(final File file, final boolean forceKeep) {
         if (file.exists()) {
-            final boolean freshEnough = listId >= StoredList.STANDARD_LIST_ID || file.lastModified() > (new Date().getTime() - (24 * 60 * 60 * 1000)) || forceKeep;
-            if (onlySave) {
-                return new ImmutablePair<>(null, true);
+            final boolean freshEnough = listId >= StoredList.STANDARD_LIST_ID || file.lastModified() > (System.currentTimeMillis() - (24 * 60 * 60 * 1000)) || forceKeep;
+            if (freshEnough && onlySave) {
+                return ImmutablePair.of((Bitmap) null, true);
             }
             final BitmapFactory.Options bfOptions = new BitmapFactory.Options();
             bfOptions.inTempStorage = new byte[16 * 1024];
@@ -393,12 +420,11 @@ public class HtmlImage implements Html.ImageGetter {
             final Bitmap image = BitmapFactory.decodeFile(file.getPath(), bfOptions);
             if (image == null) {
                 Log.e("Cannot decode bitmap from " + file.getPath());
-                return new ImmutablePair<>(null, false);
+                return ImmutablePair.of((Bitmap) null, false);
             }
-            return new ImmutablePair<>(image,
-                    freshEnough);
+            return ImmutablePair.of(image, freshEnough);
         }
-        return new ImmutablePair<>(null, false);
+        return ImmutablePair.of((Bitmap) null, false);
     }
 
     private void setSampleSize(final File file, final BitmapFactory.Options bfOptions) {

@@ -2,25 +2,25 @@ package cgeo.geocaching.ui;
 
 import butterknife.ButterKnife;
 
-import cgeo.geocaching.CgeoApplication;
 import cgeo.geocaching.Geocache;
+import cgeo.geocaching.ICoordinates;
 import cgeo.geocaching.R;
 import cgeo.geocaching.Waypoint;
 import cgeo.geocaching.connector.ConnectorFactory;
-import cgeo.geocaching.geopoint.Units;
+import cgeo.geocaching.location.Units;
+import cgeo.geocaching.sensors.Sensors;
 import cgeo.geocaching.utils.Formatter;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.eclipse.jdt.annotation.NonNull;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.res.Resources;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
+import android.widget.RatingBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -44,18 +44,20 @@ public final class CacheDetailsCreator {
     }
 
     /**
-     * @param nameId
-     * @param value
-     * @return the view containing the displayed string (i.e. the right side one from the pair of "label": "value")
+     * Create a "name: value" line.
+     *
+     * @param nameId the resource of the name field
+     * @param value the initial value
+     * @return a pair made of the whole "name: value" line (to be able to hide it for example) and of the value (to update it)
      */
-    public TextView add(final int nameId, final CharSequence value) {
+    public ImmutablePair<RelativeLayout, TextView> add(final int nameId, final CharSequence value) {
         final RelativeLayout layout = (RelativeLayout) activity.getLayoutInflater().inflate(R.layout.cache_information_item, null, false);
         final TextView nameView = ButterKnife.findById(layout, R.id.name);
         nameView.setText(res.getString(nameId));
         lastValueView = ButterKnife.findById(layout, R.id.value);
         lastValueView.setText(value);
         parentView.addView(layout);
-        return lastValueView;
+        return ImmutablePair.of(layout, lastValueView);
     }
 
     public TextView getValueView() {
@@ -70,31 +72,16 @@ public final class CacheDetailsCreator {
         final RelativeLayout layout = (RelativeLayout) activity.getLayoutInflater().inflate(R.layout.cache_information_item, null, false);
         final TextView nameView = ButterKnife.findById(layout, R.id.name);
         lastValueView = ButterKnife.findById(layout, R.id.value);
-        final LinearLayout layoutStars = ButterKnife.findById(layout, R.id.stars);
 
         nameView.setText(activity.getResources().getString(nameId));
         lastValueView.setText(String.format("%.1f", value) + ' ' + activity.getResources().getString(R.string.cache_rating_of) + " " + String.format("%d", max));
-        createStarImages(layoutStars, value, max);
+
+        final RatingBar layoutStars = ButterKnife.findById(layout, R.id.stars);
+        layoutStars.setRating(value);
         layoutStars.setVisibility(View.VISIBLE);
 
         parentView.addView(layout);
         return layout;
-    }
-
-    private void createStarImages(final ViewGroup starsContainer, final float value, final int max) {
-        final LayoutInflater inflater = LayoutInflater.from(activity);
-
-        for (int i = 0; i < max; i++) {
-            final ImageView star = (ImageView) inflater.inflate(R.layout.star_image, starsContainer, false);
-            if (value - i >= 0.75) {
-                star.setImageResource(R.drawable.star_on);
-            } else if (value - i >= 0.25) {
-                star.setImageResource(R.drawable.star_half);
-            } else {
-                star.setImageResource(R.drawable.star_off);
-            }
-            starsContainer.addView(star);
-        }
     }
 
     public void addCacheState(final Geocache cache) {
@@ -127,6 +114,13 @@ public final class CacheDetailsCreator {
         return visited != 0 ? " (" + Formatter.formatShortDate(visited) + ")" : "";
     }
 
+    private static Float distanceNonBlocking(final ICoordinates target) {
+        if (target.getCoords() == null) {
+            return null;
+        }
+        return Sensors.getInstance().currentGeo().getCoords().distanceTo(target);
+    }
+
     public void addRating(final Geocache cache) {
         if (cache.getRating() > 0) {
             final RelativeLayout itemLayout = addStars(R.string.cache_rating, cache.getRating());
@@ -139,7 +133,7 @@ public final class CacheDetailsCreator {
     }
 
     public void addSize(final Geocache cache) {
-        if (null != cache.getSize() && cache.showSize()) {
+        if (cache.showSize()) {
             add(R.string.cache_size, cache.getSize().getL10n());
         }
     }
@@ -157,7 +151,7 @@ public final class CacheDetailsCreator {
     }
 
     public void addDistance(final Geocache cache, final TextView cacheDistanceView) {
-        Float distance = CgeoApplication.getInstance().distanceNonBlocking(cache);
+        Float distance = distanceNonBlocking(cache);
         if (distance == null) {
             if (cache.getDistance() != null) {
                 distance = cache.getDistance();
@@ -176,7 +170,7 @@ public final class CacheDetailsCreator {
     }
 
     public void addDistance(final Waypoint wpt, final TextView waypointDistanceView) {
-        final Float distance = CgeoApplication.getInstance().distanceNonBlocking(wpt);
+        final Float distance = distanceNonBlocking(wpt);
         String text = "--";
         if (distance != null) {
             text = Units.getDistanceFromKilometers(distance);
@@ -201,7 +195,7 @@ public final class CacheDetailsCreator {
         if (StringUtils.isEmpty(dateString)) {
             return null;
         }
-        final TextView view = add(cache.isEventCache() ? R.string.cache_event : R.string.cache_hidden, dateString);
+        final TextView view = add(cache.isEventCache() ? R.string.cache_event : R.string.cache_hidden, dateString).right;
         view.setId(R.id.date);
         return view;
     }

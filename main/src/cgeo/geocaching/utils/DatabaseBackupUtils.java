@@ -6,9 +6,18 @@ import cgeo.geocaching.R;
 import cgeo.geocaching.ui.dialog.Dialogs;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
+
+import rx.functions.Action0;
+import rx.functions.Action1;
+import rx.functions.Func0;
+import rx.schedulers.Schedulers;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnClickListener;
 import android.content.res.Resources;
 
 import java.io.File;
@@ -21,70 +30,109 @@ public class DatabaseBackupUtils {
     }
 
     /**
-     * restore the database in a new thread, showing a progress window
+     * After confirming to overwrite the existing caches on the devices, restore the database in a new thread, showing a
+     * progress window
      *
      * @param activity
      *            calling activity
      */
     public static void restoreDatabase(final Activity activity) {
+        if (!hasBackup()) {
+            return;
+        }
+        final int caches = DataStore.getAllCachesCount();
+        if (caches == 0) {
+            restoreDatabaseInternal(activity);
+        }
+        else {
+            Dialogs.confirm(activity, R.string.init_backup_restore, activity.getString(R.string.restore_confirm_overwrite, activity.getResources().getQuantityString(R.plurals.cache_counts, caches, caches)), new OnClickListener() {
+
+                @Override
+                public void onClick(final DialogInterface dialog, final int which) {
+                    restoreDatabaseInternal(activity);
+                }
+            });
+
+        }
+    }
+
+    private static void restoreDatabaseInternal(final Activity activity) {
         final Resources res = activity.getResources();
         final ProgressDialog dialog = ProgressDialog.show(activity, res.getString(R.string.init_backup_restore), res.getString(R.string.init_restore_running), true, false);
         final AtomicBoolean restoreSuccessful = new AtomicBoolean(false);
-        new Thread() {
+        RxUtils.andThenOnUi(Schedulers.io(), new Action0() {
             @Override
-            public void run() {
+            public void call() {
                 restoreSuccessful.set(DataStore.restoreDatabaseInternal());
-                activity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        dialog.dismiss();
-                        boolean restored = restoreSuccessful.get();
-                        String message = restored ? res.getString(R.string.init_restore_success) : res.getString(R.string.init_restore_failed);
-                        Dialogs.message(activity, R.string.init_backup_restore, message);
-                        if (activity instanceof MainActivity) {
-                            ((MainActivity) activity).updateCacheCounter();
-                        }
-                    }
-                });
             }
-        }.start();
+        }, new Action0() {
+            @Override
+            public void call() {
+                dialog.dismiss();
+                final boolean restored = restoreSuccessful.get();
+                final String message = restored ? res.getString(R.string.init_restore_success) : res.getString(R.string.init_restore_failed);
+                Dialogs.message(activity, R.string.init_backup_restore, message);
+                if (activity instanceof MainActivity) {
+                    ((MainActivity) activity).updateCacheCounter();
+                }
+            }
+        });
     }
 
-    public static boolean createBackup(final Activity activity, final Runnable runAfterwards) {
+    /**
+     * Create a backup after confirming to overwrite the existing backup.
+     *
+     * @param activity
+     * @param runAfterwards
+     */
+    public static void createBackup(final Activity activity, final Runnable runAfterwards) {
         // avoid overwriting an existing backup with an empty database
         // (can happen directly after reinstalling the app)
         if (DataStore.getAllCachesCount() == 0) {
             Dialogs.message(activity, R.string.init_backup, R.string.init_backup_unnecessary);
-            return false;
+            return;
         }
+        if (hasBackup()) {
+            Dialogs.confirm(activity, R.string.init_backup, activity.getString(R.string.backup_confirm_overwrite, getBackupDateTime()), new OnClickListener() {
 
+                @Override
+                public void onClick(final DialogInterface dialog, final int which) {
+                    createBackupInternal(activity, runAfterwards);
+                }
+            });
+        }
+        else {
+            createBackupInternal(activity, runAfterwards);
+        }
+    }
+
+    private static void createBackupInternal(final Activity activity, final Runnable runAfterwards) {
         final ProgressDialog dialog = ProgressDialog.show(activity,
                 activity.getString(R.string.init_backup),
                 activity.getString(R.string.init_backup_running), true, false);
-        new Thread() {
+        RxUtils.andThenOnUi(Schedulers.io(), new Func0<String>() {
             @Override
-            public void run() {
-                final String backupFileName = DataStore.backupDatabaseInternal();
-                activity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        dialog.dismiss();
-                        Dialogs.message(activity,
-                                R.string.init_backup_backup,
-                                backupFileName != null
-                                        ? activity.getString(R.string.init_backup_success)
-                                                + "\n" + backupFileName
-                                        : activity.getString(R.string.init_backup_failed));
-                        if (runAfterwards != null) {
-                            runAfterwards.run();
-                        }
-                    }
-                });
+            public String call() {
+                return DataStore.backupDatabaseInternal();
             }
-        }.start();
-        return true;
+        }, new Action1<String>() {
+            @Override
+            public void call(final String backupFileName) {
+                dialog.dismiss();
+                Dialogs.message(activity,
+                        R.string.init_backup_backup,
+                        backupFileName != null
+                                ? activity.getString(R.string.init_backup_success)
+                                + "\n" + backupFileName
+                                : activity.getString(R.string.init_backup_failed));
+                if (runAfterwards != null) {
+                    runAfterwards.run();
+                }
+            }
+        });
     }
 
+    @Nullable
     public static File getRestoreFile() {
         final File fileSourceFile = DataStore.getBackupFileInternal();
         return fileSourceFile.exists() && fileSourceFile.length() > 0 ? fileSourceFile : null;
@@ -94,6 +142,7 @@ public class DatabaseBackupUtils {
         return getRestoreFile() != null;
     }
 
+    @NonNull
     public static String getBackupDateTime() {
         final File restoreFile = getRestoreFile();
         if (restoreFile == null) {

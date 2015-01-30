@@ -12,7 +12,6 @@ import cgeo.geocaching.activity.Progress;
 import cgeo.geocaching.apps.cache.navi.NavigationAppFactory;
 import cgeo.geocaching.apps.cache.navi.NavigationSelectionActionProvider;
 import cgeo.geocaching.apps.cachelist.MapsWithMeCacheListApp;
-import cgeo.geocaching.compatibility.Compatibility;
 import cgeo.geocaching.connector.ConnectorFactory;
 import cgeo.geocaching.connector.IConnector;
 import cgeo.geocaching.connector.gc.GCConnector;
@@ -21,12 +20,14 @@ import cgeo.geocaching.enumerations.CacheAttribute;
 import cgeo.geocaching.enumerations.LoadFlags;
 import cgeo.geocaching.enumerations.LoadFlags.SaveFlag;
 import cgeo.geocaching.enumerations.WaypointType;
-import cgeo.geocaching.geopoint.Units;
+import cgeo.geocaching.gcvote.GCVote;
+import cgeo.geocaching.gcvote.GCVoteDialog;
 import cgeo.geocaching.list.StoredList;
+import cgeo.geocaching.location.Units;
 import cgeo.geocaching.network.HtmlImage;
 import cgeo.geocaching.network.Network;
+import cgeo.geocaching.sensors.GeoData;
 import cgeo.geocaching.sensors.GeoDirHandler;
-import cgeo.geocaching.sensors.IGeoData;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.ui.AbstractCachingPageViewCreator;
 import cgeo.geocaching.ui.AnchorAwareLinkMovementMethod;
@@ -43,7 +44,6 @@ import cgeo.geocaching.ui.OwnerActionsClickListener;
 import cgeo.geocaching.ui.WeakReferenceHandler;
 import cgeo.geocaching.ui.dialog.Dialogs;
 import cgeo.geocaching.ui.logs.CacheLogsViewCreator;
-import cgeo.geocaching.utils.CancellableHandler;
 import cgeo.geocaching.utils.CryptUtils;
 import cgeo.geocaching.utils.Formatter;
 import cgeo.geocaching.utils.ImageUtils;
@@ -56,16 +56,18 @@ import cgeo.geocaching.utils.TextUtils;
 import cgeo.geocaching.utils.UnknownTagsHandler;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.io.Charsets;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.jdt.annotation.Nullable;
 
 import rx.Observable;
 import rx.Observable.OnSubscribe;
 import rx.Subscriber;
 import rx.Subscription;
-import rx.android.observables.AndroidObservable;
+import rx.android.app.AppObservable;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.subscriptions.CompositeSubscription;
@@ -84,6 +86,8 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
+import android.nfc.NdefMessage;
+import android.nfc.NfcAdapter;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -106,16 +110,15 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.view.ViewGroup;
-import android.view.ViewGroup.LayoutParams;
-import android.view.ViewParent;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.FrameLayout;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.TextView.BufferType;
@@ -183,13 +186,17 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         // get parameters
         final Bundle extras = getIntent().getExtras();
-        final Uri uri = getIntent().getData();
+        Uri uri = getIntent().getData();
 
         // try to get data from extras
         String name = null;
         String geocode = null;
         String guid = null;
-        if (extras != null) {
+
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
+            final NdefMessage msg = (NdefMessage) extras.getParcelableArray(NfcAdapter.EXTRA_NDEF_MESSAGES)[0];
+            uri = Uri.parse("http://" + new String(msg.getRecords()[0].getPayload(), Charsets.UTF_8));
+        } else if (extras != null) {
             geocode = extras.getString(Intents.EXTRA_GEOCODE);
             name = extras.getString(Intents.EXTRA_NAME);
             guid = extras.getString(Intents.EXTRA_GUID);
@@ -320,6 +327,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     @Override
+    @Nullable
     public String getAndroidBeamUri() {
         return cache != null ? cache.getCgeoUrl() : null;
     }
@@ -466,11 +474,11 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             case R.id.menu_waypoint_reset_cache_coords:
                 ensureSaved();
                 if (ConnectorFactory.getConnector(cache).supportsOwnCoordinates()) {
-                    createResetCacheCoordinatesDialog(cache, selectedWaypoint).show();
+                    createResetCacheCoordinatesDialog(selectedWaypoint).show();
                 } else {
                     final ProgressDialog progressDialog = ProgressDialog.show(this, getString(R.string.cache), getString(R.string.waypoint_reset), true);
                     final HandlerResetCoordinates handler = new HandlerResetCoordinates(this, progressDialog, false);
-                    new ResetCoordsThread(cache, handler, selectedWaypoint, true, false, progressDialog).start();
+                    resetCoords(cache, handler, selectedWaypoint, true, false, progressDialog);
                 }
                 return true;
             case R.id.menu_calendar:
@@ -488,13 +496,12 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     @Override
     public boolean onCreateOptionsMenu(final Menu menu) {
         CacheMenuHandler.addMenuItems(this, menu, cache);
-        MenuItem menuItem = menu.findItem(R.id.menu_default_navigation);
+        final MenuItem menuItem = menu.findItem(R.id.menu_default_navigation);
         final NavigationActionProvider navAction = (NavigationActionProvider) MenuItemCompat.getActionProvider(menuItem);
         if (navAction != null) {
             navAction.setNavigationSource(this);
         }
-        menuItem = menu.findItem(R.id.menu_navigate);
-        NavigationSelectionActionProvider.initialize(menuItem, cache);
+        NavigationSelectionActionProvider.initialize(menu.findItem(R.id.menu_navigate), cache);
         return true;
     }
 
@@ -505,6 +512,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         menu.findItem(R.id.menu_store).setVisible(cache != null && !cache.isOffline());
         menu.findItem(R.id.menu_delete).setVisible(cache != null && cache.isOffline());
         menu.findItem(R.id.menu_refresh).setVisible(cache != null && cache.isOffline());
+        menu.findItem(R.id.menu_gcvote).setVisible(cache != null && GCVote.isVotingPossible(cache));
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -526,6 +534,9 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             case R.id.menu_refresh:
                 refreshCache();
                 return true;
+            case R.id.menu_gcvote:
+                showVoteDialog();
+                return true;
             default:
                 if (NavigationAppFactory.onMenuItemSelected(item, this, cache)) {
                     return true;
@@ -539,6 +550,15 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         return super.onOptionsItemSelected(item);
     }
 
+    private void showVoteDialog() {
+        GCVoteDialog.show(this, cache, new Runnable() {
+            @Override
+            public void run() {
+                notifyDataSetChanged();
+            }
+        });
+    }
+
     private static final class CacheDetailsGeoDirHandler extends GeoDirHandler {
         private final WeakReference<CacheDetailActivity> activityRef;
 
@@ -547,7 +567,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
 
         @Override
-        public void updateGeoData(final IGeoData geo) {
+        public void updateGeoData(final GeoData geo) {
             final CacheDetailActivity activity = activityRef.get();
             if (activity == null) {
                 return;
@@ -556,7 +576,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 return;
             }
 
-            if (geo.getCoords() != null && activity.cache != null && activity.cache.getCoords() != null) {
+            if (activity.cache != null && activity.cache.getCoords() != null) {
                 activity.cacheDistanceView.setText(Units.getDistanceFromKilometers(geo.getCoords().distanceTo(activity.cache.getCoords())));
                 activity.cacheDistanceView.bringToFront();
             }
@@ -617,7 +637,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     private void notifyDataSetChanged() {
-        // This might get called asynchronically when the activity is shut down
+        // This might get called asynchronous when the activity is shut down
         if (isFinishing()) {
             return;
         }
@@ -722,193 +742,13 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
     }
 
-    private class AttributeViewBuilder {
-        private ViewGroup attributeIconsLayout; // layout for attribute icons
-        private ViewGroup attributeDescriptionsLayout; // layout for attribute descriptions
-        private boolean attributesShowAsIcons = true; // default: show icons
-        /**
-         * If the cache is from a non GC source, it might be without icons. Disable switching in those cases.
-         */
-        private boolean noAttributeIconsFound = false;
-        private int attributeBoxMaxWidth;
-
-        public void fillView(final LinearLayout attributeBox) {
-            // first ensure that the view is empty
-            attributeBox.removeAllViews();
-
-            // maximum width for attribute icons is screen width - paddings of parents
-            attributeBoxMaxWidth = Compatibility.getDisplayWidth();
-            ViewParent child = attributeBox;
-            do {
-                if (child instanceof View) {
-                    attributeBoxMaxWidth -= ((View) child).getPaddingLeft() + ((View) child).getPaddingRight();
-                }
-                child = child.getParent();
-            } while (child != null);
-
-            // delete views holding description / icons
-            attributeDescriptionsLayout = null;
-            attributeIconsLayout = null;
-
-            attributeBox.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(final View v) {
-                    // toggle between attribute icons and descriptions
-                    toggleAttributeDisplay(attributeBox, attributeBoxMaxWidth);
-                }
-            });
-
-            // icons or text?
-            //
-            // also show icons when noAttributeImagesFound == true. Explanation:
-            //  1. no icons could be found in the first invocation of this method
-            //  2. user refreshes cache from web
-            //  3. now this method is called again
-            //  4. attributeShowAsIcons is false but noAttributeImagesFound is true
-            //     => try to show them now
-            if (attributesShowAsIcons || noAttributeIconsFound) {
-                showAttributeIcons(attributeBox, attributeBoxMaxWidth);
-            } else {
-                showAttributeDescriptions(attributeBox);
-            }
-        }
-
-        /**
-         * lazy-creates the layout holding the icons of the caches attributes
-         * and makes it visible
-         */
-        private void showAttributeIcons(final LinearLayout attribBox, final int parentWidth) {
-            if (attributeIconsLayout == null) {
-                attributeIconsLayout = createAttributeIconsLayout(parentWidth);
-                // no matching icons found? show text
-                if (noAttributeIconsFound) {
-                    showAttributeDescriptions(attribBox);
-                    return;
-                }
-            }
-            attribBox.removeAllViews();
-            attribBox.addView(attributeIconsLayout);
-            attributesShowAsIcons = true;
-        }
-
-        /**
-         * lazy-creates the layout holding the descriptions of the caches attributes
-         * and makes it visible
-         */
-        private void showAttributeDescriptions(final LinearLayout attribBox) {
-            if (attributeDescriptionsLayout == null) {
-                attributeDescriptionsLayout = createAttributeDescriptionsLayout(attribBox);
-            }
-            attribBox.removeAllViews();
-            attribBox.addView(attributeDescriptionsLayout);
-            attributesShowAsIcons = false;
-        }
-
-        /**
-         * toggle attribute descriptions and icons
-         */
-        private void toggleAttributeDisplay(final LinearLayout attribBox, final int parentWidth) {
-            // Don't toggle when there are no icons to show.
-            if (noAttributeIconsFound) {
-                return;
-            }
-
-            // toggle
-            if (attributesShowAsIcons) {
-                showAttributeDescriptions(attribBox);
-            } else {
-                showAttributeIcons(attribBox, parentWidth);
-            }
-        }
-
-        private ViewGroup createAttributeIconsLayout(final int parentWidth) {
-            final LinearLayout rows = new LinearLayout(CacheDetailActivity.this);
-            rows.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-            rows.setOrientation(LinearLayout.VERTICAL);
-
-            LinearLayout attributeRow = newAttributeIconsRow();
-            rows.addView(attributeRow);
-
-            noAttributeIconsFound = true;
-
-            for (final String attributeName : cache.getAttributes()) {
-                // check if another attribute icon fits in this row
-                attributeRow.measure(0, 0);
-                final int rowWidth = attributeRow.getMeasuredWidth();
-                final FrameLayout fl = (FrameLayout) getLayoutInflater().inflate(R.layout.attribute_image, attributeRow, false);
-                final ImageView iv = (ImageView) fl.getChildAt(0);
-                if ((parentWidth - rowWidth) < iv.getLayoutParams().width) {
-                    // make a new row
-                    attributeRow = newAttributeIconsRow();
-                    rows.addView(attributeRow);
-                }
-
-                final boolean strikeThrough = !CacheAttribute.isEnabled(attributeName);
-                final CacheAttribute attrib = CacheAttribute.getByRawName(CacheAttribute.trimAttributeName(attributeName));
-                if (attrib != null) {
-                    noAttributeIconsFound = false;
-                    Drawable d = res.getDrawable(attrib.drawableId);
-                    iv.setImageDrawable(d);
-                    // strike through?
-                    if (strikeThrough) {
-                        // generate strike through image with same properties as attribute image
-                        final ImageView strikeThroughImage = new ImageView(CacheDetailActivity.this);
-                        strikeThroughImage.setLayoutParams(iv.getLayoutParams());
-                        d = res.getDrawable(R.drawable.attribute__strikethru);
-                        strikeThroughImage.setImageDrawable(d);
-                        fl.addView(strikeThroughImage);
-                    }
-                } else {
-                    final Drawable d = res.getDrawable(R.drawable.attribute_unknown);
-                    iv.setImageDrawable(d);
-                }
-
-                attributeRow.addView(fl);
-            }
-
-            return rows;
-        }
-
-        private LinearLayout newAttributeIconsRow() {
-            final LinearLayout rowLayout = new LinearLayout(CacheDetailActivity.this);
-            rowLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
-                    LayoutParams.WRAP_CONTENT));
-            rowLayout.setOrientation(LinearLayout.HORIZONTAL);
-            return rowLayout;
-        }
-
-        private ViewGroup createAttributeDescriptionsLayout(final LinearLayout parentView) {
-            final LinearLayout descriptions = (LinearLayout) getLayoutInflater().inflate(
-                    R.layout.attribute_descriptions, parentView, false);
-            final TextView attribView = (TextView) descriptions.getChildAt(0);
-
-            final StringBuilder buffer = new StringBuilder();
-            for (String attributeName : cache.getAttributes()) {
-                final boolean enabled = CacheAttribute.isEnabled(attributeName);
-                // search for a translation of the attribute
-                final CacheAttribute attrib = CacheAttribute.getByRawName(CacheAttribute.trimAttributeName(attributeName));
-                if (attrib != null) {
-                    attributeName = attrib.getL10n(enabled);
-                }
-                if (buffer.length() > 0) {
-                    buffer.append('\n');
-                }
-                buffer.append(attributeName);
-            }
-
-            attribView.setText(buffer);
-
-            return descriptions;
-        }
-    }
-
     private void refreshCache() {
         if (progress.isShowing()) {
             showToast(res.getString(R.string.err_detail_still_working));
             return;
         }
 
-        if (!Network.isNetworkConnected(getApplicationContext())) {
+        if (!Network.isNetworkConnected()) {
             showToast(getString(R.string.err_server));
             return;
         }
@@ -917,7 +757,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         progress.show(this, res.getString(R.string.cache_dialog_refresh_title), res.getString(R.string.cache_dialog_refresh_message), true, refreshCacheHandler.cancelMessage());
 
-        cache.refresh(refreshCacheHandler, RxUtils.networkScheduler);
+        cache.refresh(refreshCacheHandler, RxUtils.refreshScheduler);
     }
 
     private void dropCache() {
@@ -954,12 +794,9 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
      * Creator for details-view.
      */
     private class DetailsViewCreator extends AbstractCachingPageViewCreator<ScrollView> {
-        /**
-         * Reference to the details list, so that the helper-method can access it without an additional argument
-         */
+        // Reference to the details list and favorite line, so that the helper-method can access them without an additional argument
         private LinearLayout detailsList;
-
-        private Thread watchlistThread;
+        private ImmutablePair<RelativeLayout, TextView> favoriteLine;
 
         @Override
         public ScrollView getDispatchedView(final ViewGroup parentView) {
@@ -971,7 +808,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             view = (ScrollView) getLayoutInflater().inflate(R.layout.cachedetail_details_page, parentView, false);
 
             // Start loading preview map
-            AndroidObservable.bindActivity(CacheDetailActivity.this, previewMap).subscribeOn(RxUtils.networkScheduler)
+            AppObservable.bindActivity(CacheDetailActivity.this, previewMap).subscribeOn(RxUtils.networkScheduler)
                     .subscribe(new Action1<BitmapDrawable>() {
                         @Override
                         public void call(final BitmapDrawable image) {
@@ -996,10 +833,10 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 span.setSpan(new ForegroundColorSpan(res.getColor(R.color.archived_cache_color)), 0, span.toString().length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
 
-            addContextMenu(details.add(R.string.cache_name, span));
+            addContextMenu(details.add(R.string.cache_name, span).right);
             details.add(R.string.cache_type, cache.getType().getL10n());
             details.addSize(cache);
-            addContextMenu(details.add(R.string.cache_geocode, cache.getGeocode()));
+            addContextMenu(details.add(R.string.cache_geocode, cache.getGeocode()).right);
             details.addCacheState(cache);
 
             details.addDistance(cache, cacheDistanceView);
@@ -1010,9 +847,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             details.addRating(cache);
 
             // favorite count
-            if (cache.getFavoritePoints() > 0) {
-                details.add(R.string.cache_favorite, cache.getFavoritePoints() + "×");
-            }
+            favoriteLine = details.add(R.string.cache_favorite, "");
 
             // own rating
             if (cache.getMyVote() > 0) {
@@ -1021,7 +856,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
             // cache author
             if (StringUtils.isNotBlank(cache.getOwnerDisplayName()) || StringUtils.isNotBlank(cache.getOwnerUserId())) {
-                final TextView ownerView = details.add(R.string.cache_owner, "");
+                final TextView ownerView = details.add(R.string.cache_owner, "").right;
                 if (StringUtils.isNotBlank(cache.getOwnerDisplayName())) {
                     ownerView.setText(cache.getOwnerDisplayName(), TextView.BufferType.SPANNABLE);
                 } else { // OwnerReal guaranteed to be not blank based on above
@@ -1043,17 +878,15 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
             // cache coordinates
             if (cache.getCoords() != null) {
-                final TextView valueView = details.add(R.string.cache_coordinates, cache.getCoords().toString());
+                final TextView valueView = details.add(R.string.cache_coordinates, cache.getCoords().toString()).right;
                 valueView.setOnClickListener(new CoordinatesFormatSwitcher(cache.getCoords()));
                 addContextMenu(valueView);
             }
 
             // cache attributes
-            if (!cache.getAttributes().isEmpty()) {
-                final LinearLayout innerLayout = ButterKnife.findById(view, R.id.attributes_innerbox);
-                new AttributeViewBuilder().fillView(innerLayout);
-                view.findViewById(R.id.attributes_box).setVisibility(View.VISIBLE);
-            }
+            updateAttributesText();
+            updateAttributesIcons();
+            ButterKnife.findById(view, R.id.attributes_box).setVisibility(cache.getAttributes().isEmpty() ? View.GONE : View.VISIBLE);
 
             updateOfflineBox(view, cache, res, new RefreshCacheClickListener(), new DropCacheClickListener(), new StoreCacheClickListener());
 
@@ -1092,6 +925,61 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             return view;
         }
 
+        private void updateAttributesIcons() {
+            final GridView gridView = ButterKnife.findById(view, R.id.attributes_grid);
+            final List<String> attributes = cache.getAttributes();
+            if (attributes.isEmpty()) {
+                gridView.setVisibility(View.GONE);
+                return;
+            }
+            gridView.setAdapter(new AttributesGridAdapter(CacheDetailActivity.this, cache));
+            gridView.setVisibility(View.VISIBLE);
+            gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(final android.widget.AdapterView<?> parent, final View view, final int position, final long id) {
+                    toggleAttributesView();
+                }
+            });
+        }
+
+        protected void toggleAttributesView() {
+            final View textView = ButterKnife.findById(view, R.id.attributes_text);
+            textView.setVisibility(textView.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            final View gridView = ButterKnife.findById(view, R.id.attributes_grid);
+            gridView.setVisibility(gridView.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+        }
+
+        private void updateAttributesText() {
+            final TextView attribView = ButterKnife.findById(view, R.id.attributes_text);
+            final List<String> attributes = cache.getAttributes();
+            if (attributes.isEmpty()) {
+                attribView.setVisibility(View.GONE);
+                return;
+            }
+            final StringBuilder text = new StringBuilder();
+            for (String attributeName : attributes) {
+                final boolean enabled = CacheAttribute.isEnabled(attributeName);
+                // search for a translation of the attribute
+                final CacheAttribute attrib = CacheAttribute.getByRawName(CacheAttribute.trimAttributeName(attributeName));
+                if (attrib != null) {
+                    attributeName = attrib.getL10n(enabled);
+                }
+                if (text.length() > 0) {
+                    text.append('\n');
+                }
+                text.append(attributeName);
+            }
+            attribView.setText(text);
+            attribView.setVisibility(View.GONE);
+            attribView.setOnClickListener(new OnClickListener() {
+
+                @Override
+                public void onClick(final View v) {
+                    toggleAttributesView();
+                }
+            });
+        }
+
         private class StoreCacheClickListener implements View.OnClickListener {
             @Override
             public void onClick(final View arg0) {
@@ -1117,164 +1005,133 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         /**
          * Abstract Listener for add / remove buttons for watchlist
          */
-        private abstract class AbstractWatchlistClickListener implements View.OnClickListener {
-            public void doExecute(final int titleId, final int messageId, final Thread thread) {
+        private abstract class AbstractPropertyListener implements View.OnClickListener {
+
+            private final SimpleCancellableHandler handler = new SimpleCancellableHandler(CacheDetailActivity.this, progress) {
+                @Override
+                public void handleRegularMessage(final Message message) {
+                    super.handleRegularMessage(message);
+                    updateWatchlistBox();
+                    updateFavPointBox();
+                }
+            };
+
+            public void doExecute(final int titleId, final int messageId, final Action1<SimpleCancellableHandler> action) {
                 if (progress.isShowing()) {
                     showToast(res.getString(R.string.err_watchlist_still_managing));
                     return;
                 }
                 progress.show(CacheDetailActivity.this, res.getString(titleId), res.getString(messageId), true, null);
-
-                if (watchlistThread != null) {
-                    watchlistThread.interrupt();
-                }
-
-                watchlistThread = thread;
-                watchlistThread.start();
+                RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+                    @Override
+                    public void call() {
+                        action.call(handler);
+                    }
+                });
             }
         }
 
         /**
          * Listener for "add to watchlist" button
          */
-        private class AddToWatchlistClickListener extends AbstractWatchlistClickListener {
+        private class AddToWatchlistClickListener extends AbstractPropertyListener {
             @Override
             public void onClick(final View arg0) {
                 doExecute(R.string.cache_dialog_watchlist_add_title,
                         R.string.cache_dialog_watchlist_add_message,
-                        new WatchlistAddThread(new SimpleUpdateHandler(CacheDetailActivity.this, progress)));
+                        new Action1<SimpleCancellableHandler>() {
+                            @Override
+                            public void call(final SimpleCancellableHandler simpleCancellableHandler) {
+                                watchListAdd(simpleCancellableHandler);
+                            }
+                        });
             }
         }
 
         /**
          * Listener for "remove from watchlist" button
          */
-        private class RemoveFromWatchlistClickListener extends AbstractWatchlistClickListener {
+        private class RemoveFromWatchlistClickListener extends AbstractPropertyListener {
             @Override
             public void onClick(final View arg0) {
                 doExecute(R.string.cache_dialog_watchlist_remove_title,
                         R.string.cache_dialog_watchlist_remove_message,
-                        new WatchlistRemoveThread(new SimpleUpdateHandler(CacheDetailActivity.this, progress)));
+                        new Action1<SimpleCancellableHandler>() {
+                            @Override
+                            public void call(final SimpleCancellableHandler simpleCancellableHandler) {
+                                watchListRemove(simpleCancellableHandler);
+                            }
+                        });
             }
         }
 
-        /** Thread to add this cache to the watchlist of the user */
-        private class WatchlistAddThread extends Thread {
-            private final Handler handler;
-
-            public WatchlistAddThread(final Handler handler) {
-                this.handler = handler;
-            }
-
-            @Override
-            public void run() {
-                watchlistThread = null;
-                Message msg;
-                if (ConnectorFactory.getConnector(cache).addToWatchlist(cache)) {
-                    msg = Message.obtain(handler, MESSAGE_SUCCEEDED);
-                } else {
-                    msg = Message.obtain(handler, MESSAGE_FAILED);
-                    final Bundle bundle = new Bundle();
-                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, res.getString(R.string.err_watchlist_failed));
-                    msg.setData(bundle);
-                }
-                handler.sendMessage(msg);
+        /** Add this cache to the watchlist of the user */
+        private void watchListAdd(final SimpleCancellableHandler handler) {
+            if (ConnectorFactory.getConnector(cache).addToWatchlist(cache)) {
+                handler.obtainMessage(MESSAGE_SUCCEEDED).sendToTarget();
+            } else {
+                handler.sendTextMessage(MESSAGE_FAILED, R.string.err_watchlist_failed);
             }
         }
 
-        /** Thread to remove this cache from the watchlist of the user */
-        private class WatchlistRemoveThread extends Thread {
-            private final Handler handler;
-
-            public WatchlistRemoveThread(final Handler handler) {
-                this.handler = handler;
-            }
-
-            @Override
-            public void run() {
-                watchlistThread = null;
-                Message msg;
-                if (ConnectorFactory.getConnector(cache).removeFromWatchlist(cache)) {
-                    msg = Message.obtain(handler, MESSAGE_SUCCEEDED);
-                } else {
-                    msg = Message.obtain(handler, MESSAGE_FAILED);
-                    final Bundle bundle = new Bundle();
-                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, res.getString(R.string.err_watchlist_failed));
-                    msg.setData(bundle);
-                }
-                handler.sendMessage(msg);
+        /** Remove this cache from the watchlist of the user */
+        private void watchListRemove(final SimpleCancellableHandler handler) {
+            if (ConnectorFactory.getConnector(cache).removeFromWatchlist(cache)) {
+                handler.obtainMessage(MESSAGE_SUCCEEDED).sendToTarget();
+            } else {
+                handler.sendTextMessage(MESSAGE_FAILED, R.string.err_watchlist_failed);
             }
         }
 
-        /** Thread to add this cache to the favorite list of the user */
-        private class FavoriteAddThread extends Thread {
-            private final Handler handler;
-
-            public FavoriteAddThread(final Handler handler) {
-                this.handler = handler;
-            }
-
-            @Override
-            public void run() {
-                watchlistThread = null;
-                Message msg;
-                if (GCConnector.addToFavorites(cache)) {
-                    msg = Message.obtain(handler, MESSAGE_SUCCEEDED);
-                } else {
-                    msg = Message.obtain(handler, MESSAGE_FAILED);
-                    final Bundle bundle = new Bundle();
-                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, res.getString(R.string.err_favorite_failed));
-                    msg.setData(bundle);
-                }
-                handler.sendMessage(msg);
+        /** Add this cache to the favorite list of the user */
+        private void favoriteAdd(final SimpleCancellableHandler handler) {
+            if (GCConnector.addToFavorites(cache)) {
+                handler.obtainMessage(MESSAGE_SUCCEEDED).sendToTarget();
+            } else {
+                handler.sendTextMessage(MESSAGE_FAILED, R.string.err_favorite_failed);
             }
         }
 
-        /** Thread to remove this cache to the favorite list of the user */
-        private class FavoriteRemoveThread extends Thread {
-            private final Handler handler;
-
-            public FavoriteRemoveThread(final Handler handler) {
-                this.handler = handler;
-            }
-
-            @Override
-            public void run() {
-                watchlistThread = null;
-                Message msg;
-                if (GCConnector.removeFromFavorites(cache)) {
-                    msg = Message.obtain(handler, MESSAGE_SUCCEEDED);
-                } else {
-                    msg = Message.obtain(handler, MESSAGE_FAILED);
-                    final Bundle bundle = new Bundle();
-                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, res.getString(R.string.err_favorite_failed));
-                    msg.setData(bundle);
-                }
-                handler.sendMessage(msg);
+        /** Remove this cache to the favorite list of the user */
+        private void favoriteRemove(final SimpleCancellableHandler handler) {
+            if (GCConnector.removeFromFavorites(cache)) {
+                handler.obtainMessage(MESSAGE_SUCCEEDED).sendToTarget();
+            } else {
+                handler.sendTextMessage(MESSAGE_FAILED, R.string.err_favorite_failed);
             }
         }
 
         /**
          * Listener for "add to favorites" button
          */
-        private class FavoriteAddClickListener extends AbstractWatchlistClickListener {
+        private class FavoriteAddClickListener extends AbstractPropertyListener {
             @Override
             public void onClick(final View arg0) {
                 doExecute(R.string.cache_dialog_favorite_add_title,
                         R.string.cache_dialog_favorite_add_message,
-                        new FavoriteAddThread(new SimpleUpdateHandler(CacheDetailActivity.this, progress)));
+                        new Action1<SimpleCancellableHandler>() {
+                            @Override
+                            public void call(final SimpleCancellableHandler simpleCancellableHandler) {
+                                favoriteAdd(simpleCancellableHandler);
+                            }
+                        });
             }
         }
 
         /**
          * Listener for "remove from favorites" button
          */
-        private class FavoriteRemoveClickListener extends AbstractWatchlistClickListener {
+        private class FavoriteRemoveClickListener extends AbstractPropertyListener {
             @Override
             public void onClick(final View arg0) {
                 doExecute(R.string.cache_dialog_favorite_remove_title,
                         R.string.cache_dialog_favorite_remove_message,
-                        new FavoriteRemoveThread(new SimpleUpdateHandler(CacheDetailActivity.this, progress)));
+                        new Action1<SimpleCancellableHandler>() {
+                            @Override
+                            public void call(final SimpleCancellableHandler simpleCancellableHandler) {
+                                favoriteRemove(simpleCancellableHandler);
+                            }
+                        });
             }
         }
 
@@ -1283,7 +1140,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
          */
         private class ChangeListClickListener implements View.OnClickListener {
             @Override
-            public void onClick(final View view) {
+            public void onClick(final View v) {
                 new StoredList.UserInterface(CacheDetailActivity.this).promptForListSelection(R.string.list_title,
                         new Action1<Integer>() {
                             @Override
@@ -1311,7 +1168,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
 
         /**
-         * shows/hides buttons, sets text in watchlist box
+         * Show/hide buttons, set text in watchlist box
          */
         private void updateWatchlistBox() {
             final LinearLayout layout = ButterKnife.findById(view, R.id.watchlist_box);
@@ -1341,13 +1198,20 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 buttonRemove.setEnabled(false);
                 buttonRemove.setVisibility(View.GONE);
             }
-
         }
 
         /**
-         * shows/hides buttons, sets text in watchlist box
+         * Show/hide buttons, set text in favorite line and box
          */
         private void updateFavPointBox() {
+            // Favorite counts
+            if (cache.getFavoritePoints() > 0) {
+                favoriteLine.left.setVisibility(View.VISIBLE);
+                favoriteLine.right.setText(cache.getFavoritePoints() + "×");
+            } else {
+                favoriteLine.left.setVisibility(View.GONE);
+            }
+
             final LinearLayout layout = ButterKnife.findById(view, R.id.favpoint_box);
             final boolean supportsFavoritePoints = cache.supportsFavoritePoints();
             layout.setVisibility(supportsFavoritePoints ? View.VISIBLE : View.GONE);
@@ -1390,12 +1254,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 // update text
                 final TextView text = ButterKnife.findById(view, R.id.list_text);
                 final StoredList list = DataStore.getList(cache.getListId());
-                if (list != null) {
-                    text.setText(res.getString(R.string.cache_list_text) + " " + list.title);
-                } else {
-                    // this should not happen
-                    text.setText(R.string.cache_list_unknown);
-                }
+                text.setText(res.getString(R.string.cache_list_text) + " " + list.title);
             } else {
                 // hide box
                 box.setVisibility(View.GONE);
@@ -1551,19 +1410,26 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             return view;
         }
 
-        Thread currentThread;
-
         private void uploadPersonalNote() {
             final SimpleCancellableHandler myHandler = new SimpleCancellableHandler(CacheDetailActivity.this, progress);
 
             final Message cancelMessage = myHandler.cancelMessage(res.getString(R.string.cache_personal_note_upload_cancelled));
             progress.show(CacheDetailActivity.this, res.getString(R.string.cache_personal_note_uploading), res.getString(R.string.cache_personal_note_uploading), true, cancelMessage);
 
-            if (currentThread != null) {
-                currentThread.interrupt();
-            }
-            currentThread = new UploadPersonalNoteThread(cache, myHandler);
-            currentThread.start();
+            myHandler.unsubscribeIfCancelled(RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+                @Override
+                public void call() {
+                    final IConnector con = ConnectorFactory.getConnector(cache);
+                    if (con.supportsPersonalNote()) {
+                        con.uploadPersonalNote(cache);
+                    }
+                    final Message msg = Message.obtain();
+                    final Bundle bundle = new Bundle();
+                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, CgeoApplication.getInstance().getString(R.string.cache_personal_note_upload_done));
+                    msg.setData(bundle);
+                    myHandler.sendMessage(msg);
+                }
+            }));
         }
 
         private void loadLongDescription() {
@@ -1597,9 +1463,11 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         if (unknownTagsHandler.isProblematicDetected()) {
             final int startPos = description.length();
             final IConnector connector = ConnectorFactory.getConnector(cache);
-            final Spanned tableNote = Html.fromHtml(res.getString(R.string.cache_description_table_note, "<a href=\"" + cache.getUrl() + "\">" + connector.getName() + "</a>"));
-            ((Editable) description).append("\n\n").append(tableNote);
-            ((Editable) description).setSpan(new StyleSpan(Typeface.ITALIC), startPos, description.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            if (StringUtils.isNotEmpty(cache.getUrl())) {
+                final Spanned tableNote = Html.fromHtml(res.getString(R.string.cache_description_table_note, "<a href=\"" + cache.getUrl() + "\">" + connector.getName() + "</a>"));
+                ((Editable) description).append("\n\n").append(tableNote);
+                ((Editable) description).setSpan(new StyleSpan(Typeface.ITALIC), startPos, description.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
         }
     }
     /**
@@ -1637,7 +1505,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     private static void fixTextColor(final String descriptionString, final IndexOutOfBoundsAvoidingTextView descriptionView) {
-        int backcolor;
+        final int backcolor;
         if (Settings.isLightSkin()) {
             backcolor = color.white;
 
@@ -1698,7 +1566,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     private class WaypointsViewCreator extends AbstractCachingPageViewCreator<ListView> {
-        private final int VISITED_INSET = (int) (6.6f * CgeoApplication.getInstance().getResources().getDisplayMetrics().density + 0.5f);
+        private final int visitedInset = (int) (6.6f * CgeoApplication.getInstance().getResources().getDisplayMetrics().density + 0.5f);
 
         @Override
         public ListView getDispatchedView(final ViewGroup parentView) {
@@ -1781,15 +1649,15 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             } else {
                 nameView.setText(res.getString(R.string.waypoint));
             }
-            setWaypointIcon(res, nameView, wpt);
+            setWaypointIcon(nameView, wpt);
 
             // visited
             if (wpt.isVisited()) {
-                final TypedValue a = new TypedValue();
-                getTheme().resolveAttribute(R.attr.text_color_grey, a, true);
-                if (a.type >= TypedValue.TYPE_FIRST_COLOR_INT && a.type <= TypedValue.TYPE_LAST_COLOR_INT) {
+                final TypedValue typedValue = new TypedValue();
+                getTheme().resolveAttribute(R.attr.text_color_grey, typedValue, true);
+                if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT) {
                     // really should be just a color!
-                    nameView.setTextColor(a.data);
+                    nameView.setTextColor(typedValue.data);
                 }
             }
 
@@ -1845,15 +1713,15 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             });
         }
 
-        private void setWaypointIcon(final Resources res, final TextView nameView, final Waypoint wpt) {
+        private void setWaypointIcon(final TextView nameView, final Waypoint wpt) {
             final WaypointType waypointType = wpt.getWaypointType();
             final Drawable icon;
             if (wpt.isVisited()) {
                 final LayerDrawable ld = new LayerDrawable(new Drawable[] {
                         res.getDrawable(waypointType.markerId),
                         res.getDrawable(R.drawable.tick) });
-                ld.setLayerInset(0, 0, 0, VISITED_INSET, VISITED_INSET);
-                ld.setLayerInset(1, VISITED_INSET, VISITED_INSET, 0, 0);
+                ld.setLayerInset(0, 0, 0, visitedInset, visitedInset);
+                ld.setLayerInset(1, visitedInset, visitedInset, 0, 0);
                 icon = ld;
             } else {
                 icon = res.getDrawable(waypointType.markerId);
@@ -2009,7 +1877,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     /**
      * A dialog to allow the user to select reseting coordinates local/remote/both.
      */
-    private AlertDialog createResetCacheCoordinatesDialog(final Geocache cache, final Waypoint wpt) {
+    private AlertDialog createResetCacheCoordinatesDialog(final Waypoint wpt) {
 
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.waypoint_reset_cache_coords);
@@ -2022,13 +1890,16 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 dialog.dismiss();
                 final ProgressDialog progressDialog = ProgressDialog.show(CacheDetailActivity.this, getString(R.string.cache), getString(R.string.waypoint_reset), true);
                 final HandlerResetCoordinates handler = new HandlerResetCoordinates(CacheDetailActivity.this, progressDialog, which == 1);
-                new ResetCoordsThread(cache, handler, wpt, which == 0 || which == 1, which == 1, progressDialog).start();
+                resetCoords(cache, handler, wpt, which == 0 || which == 1, which == 1, progressDialog);
             }
         });
         return builder.create();
     }
 
     private static class HandlerResetCoordinates extends WeakReferenceHandler<CacheDetailActivity> {
+        public static final int LOCAL = 0;
+        public static final int ON_WEBSITE = 1;
+
         private boolean remoteFinished = false;
         private boolean localFinished = false;
         private final ProgressDialog progressDialog;
@@ -2042,7 +1913,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         @Override
         public void handleMessage(final Message msg) {
-            if (msg.what == ResetCoordsThread.LOCAL) {
+            if (msg.what == LOCAL) {
                 localFinished = true;
             } else {
                 remoteFinished = true;
@@ -2059,94 +1930,53 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
     }
 
-    private class ResetCoordsThread extends Thread {
-
-        private final Geocache cache;
-        private final Handler handler;
-        private final boolean local;
-        private final boolean remote;
-        private final Waypoint wpt;
-        private final ProgressDialog progress;
-        public static final int LOCAL = 0;
-        public static final int ON_WEBSITE = 1;
-
-        public ResetCoordsThread(final Geocache cache, final Handler handler, final Waypoint wpt, final boolean local, final boolean remote, final ProgressDialog progress) {
-            this.cache = cache;
-            this.handler = handler;
-            this.local = local;
-            this.remote = remote;
-            this.wpt = wpt;
-            this.progress = progress;
-        }
-
-        @Override
-        public void run() {
-
-            if (local) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        progress.setMessage(res.getString(R.string.waypoint_reset_cache_coords));
-                    }
-                });
-                cache.setCoords(wpt.getCoords());
-                cache.setUserModifiedCoords(false);
-                cache.deleteWaypointForce(wpt);
-                DataStore.saveChangedCache(cache);
-                handler.sendEmptyMessage(LOCAL);
-            }
-
-            final IConnector con = ConnectorFactory.getConnector(cache);
-            if (remote && con.supportsOwnCoordinates()) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        progress.setMessage(res.getString(R.string.waypoint_coordinates_being_reset_on_website));
-                    }
-                });
-
-                final boolean result = con.deleteModifiedCoordinates(cache);
-
-                runOnUiThread(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        if (result) {
-                            showToast(getString(R.string.waypoint_coordinates_has_been_reset_on_website));
-                        } else {
-                            showToast(getString(R.string.waypoint_coordinates_upload_error));
+    private void resetCoords(final Geocache cache, final Handler handler, final Waypoint wpt, final boolean local, final boolean remote, final ProgressDialog progress) {
+        RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+            @Override
+            public void call() {
+                if (local) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progress.setMessage(res.getString(R.string.waypoint_reset_cache_coords));
                         }
-                        handler.sendEmptyMessage(ON_WEBSITE);
-                        notifyDataSetChanged();
-                    }
+                    });
+                    cache.setCoords(wpt.getCoords());
+                    cache.setUserModifiedCoords(false);
+                    cache.deleteWaypointForce(wpt);
+                    DataStore.saveChangedCache(cache);
+                    handler.sendEmptyMessage(HandlerResetCoordinates.LOCAL);
+                }
 
-                });
+                final IConnector con = ConnectorFactory.getConnector(cache);
+                if (remote && con.supportsOwnCoordinates()) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progress.setMessage(res.getString(R.string.waypoint_coordinates_being_reset_on_website));
+                        }
+                    });
 
+                    final boolean result = con.deleteModifiedCoordinates(cache);
+
+                    runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            if (result) {
+                                showToast(getString(R.string.waypoint_coordinates_has_been_reset_on_website));
+                            } else {
+                                showToast(getString(R.string.waypoint_coordinates_upload_error));
+                            }
+                            handler.sendEmptyMessage(HandlerResetCoordinates.ON_WEBSITE);
+                            notifyDataSetChanged();
+                        }
+
+                    });
+
+                }
             }
-        }
-    }
-
-    private static class UploadPersonalNoteThread extends Thread {
-        private Geocache cache = null;
-        private CancellableHandler handler = null;
-
-        public UploadPersonalNoteThread(final Geocache cache, final CancellableHandler handler) {
-            this.cache = cache;
-            this.handler = handler;
-        }
-
-        @Override
-        public void run() {
-            final IConnector con = ConnectorFactory.getConnector(cache);
-            if (con.supportsPersonalNote()) {
-                con.uploadPersonalNote(cache);
-            }
-            final Message msg = Message.obtain();
-            final Bundle bundle = new Bundle();
-            bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, CgeoApplication.getInstance().getString(R.string.cache_personal_note_upload_done));
-            msg.setData(bundle);
-            handler.sendMessage(msg);
-        }
+        });
     }
 
     @Override
@@ -2221,7 +2051,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         if (cache.isOffline()) {
             final long diff = (System.currentTimeMillis() / (60 * 1000)) - (cache.getDetailedUpdate() / (60 * 1000)); // minutes
 
-            String ago;
+            final String ago;
             if (diff < 15) {
                 ago = res.getString(R.string.cache_offline_time_mins_few);
             } else if (diff < 50) {
@@ -2297,22 +2127,6 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         @Override
         public void handleMessage(final Message msg) {
             notifyDataSetChanged(activityRef);
-        }
-    }
-
-    private static final class SimpleUpdateHandler extends SimpleHandler {
-
-        public SimpleUpdateHandler(final CacheDetailActivity activity, final Progress progress) {
-            super(activity, progress);
-        }
-
-        @Override
-        public void handleMessage(final Message msg) {
-            if (msg.what == MESSAGE_FAILED) {
-                super.handleMessage(msg);
-            } else {
-                notifyDataSetChanged(activityRef);
-            }
         }
     }
 

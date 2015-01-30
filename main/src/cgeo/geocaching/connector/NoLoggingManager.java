@@ -1,9 +1,11 @@
 package cgeo.geocaching.connector;
 
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.TrackableLog;
 import cgeo.geocaching.enumerations.LogType;
 import cgeo.geocaching.enumerations.StatusCode;
+
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import android.net.Uri;
 
@@ -11,7 +13,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 
-public class NoLoggingManager extends AbstractLoggingManager {
+class NoLoggingManager extends AbstractLoggingManager {
 
     @Override
     public void init() {
@@ -19,12 +21,14 @@ public class NoLoggingManager extends AbstractLoggingManager {
     }
 
     @Override
-    public LogResult postLog(Geocache cache, LogType logType, Calendar date, String log, String logPassword, List<TrackableLog> trackableLogs) {
+    @NonNull
+    public LogResult postLog(@NonNull final LogType logType, @NonNull final Calendar date, @NonNull final String log, @Nullable final String logPassword, @NonNull final List<TrackableLog> trackableLogs) {
         return new LogResult(StatusCode.LOG_POST_ERROR, "");
     }
 
     @Override
-    public ImageResult postLogImage(String logId, String imageCaption, String imageDescription, Uri imageUri) {
+    @NonNull
+    public ImageResult postLogImage(final String logId, final String imageCaption, final String imageDescription, final Uri imageUri) {
         return new ImageResult(StatusCode.LOG_POST_ERROR, "");
     }
 
@@ -34,6 +38,7 @@ public class NoLoggingManager extends AbstractLoggingManager {
     }
 
     @Override
+    @NonNull
     public List<LogType> getPossibleLogTypes() {
         return Collections.emptyList();
     }

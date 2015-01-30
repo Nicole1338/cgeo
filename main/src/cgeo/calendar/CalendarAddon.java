@@ -2,12 +2,13 @@ package cgeo.calendar;
 
 import cgeo.geocaching.Geocache;
 import cgeo.geocaching.R;
-import cgeo.geocaching.geopoint.GeopointFormatter;
+import cgeo.geocaching.location.GeopointFormatter;
 import cgeo.geocaching.network.Parameters;
 import cgeo.geocaching.ui.dialog.Dialogs;
 import cgeo.geocaching.utils.ProcessUtils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
 
 import android.app.Activity;
 import android.content.DialogInterface;
@@ -27,10 +28,11 @@ public class CalendarAddon {
         return ProcessUtils.isIntentAvailable(ICalendar.INTENT, Uri.parse(ICalendar.URI_SCHEME + "://" + ICalendar.URI_HOST));
     }
 
-    public static void addToCalendarWithIntent(final Activity activity, final Geocache cache) {
+    public static void addToCalendarWithIntent(@NonNull final Activity activity, @NonNull final Geocache cache) {
         final Resources res = activity.getResources();
         if (CalendarAddon.isAvailable()) {
             final Date hiddenDate = cache.getHiddenDate();
+            final String startTime = cache.guessEventTimeMinutes() >= 0 ? String.valueOf(cache.guessEventTimeMinutes()) : StringUtils.EMPTY;
             final Parameters params = new Parameters(
                     ICalendar.PARAM_NAME, cache.getName(),
                     ICalendar.PARAM_NOTE, StringUtils.defaultString(cache.getPersonalNote()),
@@ -39,7 +41,7 @@ public class CalendarAddon {
                     ICalendar.PARAM_COORDS, cache.getCoords() == null ? "" : cache.getCoords().format(GeopointFormatter.Format.LAT_LON_DECMINUTE_RAW),
                     ICalendar.PARAM_LOCATION, StringUtils.defaultString(cache.getLocation()),
                     ICalendar.PARAM_SHORT_DESC, StringUtils.defaultString(cache.getShortDescription()),
-                    ICalendar.PARAM_START_TIME_MINUTES, StringUtils.defaultString(cache.guessEventTimeMinutes())
+                    ICalendar.PARAM_START_TIME_MINUTES, startTime
                     );
 
             activity.startActivity(new Intent(ICalendar.INTENT,
@@ -51,7 +53,7 @@ public class CalendarAddon {
                     .append(res.getString(R.string.addon_download_prompt))
                     .toString(), new DialogInterface.OnClickListener() {
                 @Override
-                public void onClick(DialogInterface dialog, int id) {
+                public void onClick(final DialogInterface dialog, final int id) {
                     final Intent intent = new Intent(Intent.ACTION_VIEW);
                     intent.setData(Uri.parse(ICalendar.CALENDAR_ADDON_URI));
                     activity.startActivity(intent);

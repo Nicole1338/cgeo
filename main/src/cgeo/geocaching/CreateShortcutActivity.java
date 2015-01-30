@@ -92,16 +92,13 @@ public class CreateShortcutActivity extends AbstractActionBarActivity {
 
             @Override
             public void call(final Integer listId) {
-                createOfflineListShortcut(listId.intValue());
+                createOfflineListShortcut(listId);
             }
         }, true, -1);
     }
 
     protected void createOfflineListShortcut(final int listId) {
         final StoredList list = DataStore.getList(listId);
-        if (list == null) {
-            return;
-        }
         // target to be executed by the shortcut
         final Intent targetIntent = new Intent(this, CacheListActivity.class);
         targetIntent.putExtra(Intents.EXTRA_LIST_ID, list.id);

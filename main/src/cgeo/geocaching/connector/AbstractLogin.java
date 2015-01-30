@@ -4,9 +4,11 @@ import cgeo.geocaching.CgeoApplication;
 import cgeo.geocaching.R;
 import cgeo.geocaching.enumerations.StatusCode;
 import cgeo.geocaching.network.Cookies;
+import cgeo.geocaching.network.Network;
 import cgeo.geocaching.settings.Settings;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
 
 public abstract class AbstractLogin {
 
@@ -38,7 +40,7 @@ public abstract class AbstractLogin {
         return actualLoginStatus;
     }
 
-    protected void setActualLoginStatus(boolean loginStatus) {
+    protected void setActualLoginStatus(final boolean loginStatus) {
         actualLoginStatus = loginStatus;
     }
 
@@ -46,7 +48,7 @@ public abstract class AbstractLogin {
         return actualUserName;
     }
 
-    protected void setActualUserName(String userName) {
+    protected void setActualUserName(final String userName) {
         actualUserName = userName;
     }
 
@@ -68,10 +70,15 @@ public abstract class AbstractLogin {
         setActualStatus(CgeoApplication.getInstance().getString(R.string.err_login));
     }
 
+    @NonNull
     public StatusCode login() {
+        if (!Network.isNetworkConnected()) {
+            return StatusCode.COMMUNICATION_ERROR;
+        }
         return login(true);
     }
 
+    @NonNull
     protected abstract StatusCode login(boolean retry);
 
 }

@@ -74,7 +74,6 @@
   <string name="log_tb_visit">Obisk</string>
   <string name="log_tb_drop">Pusti v zakladu</string>
   <string name="log_tb_changeall">Spremeni vse</string>
-  <string name="log_save">Shrani</string>
   <string name="log_saving">Pošiljam…</string>
   <string name="log_saving_and_uploading">Pošiljam zapis in nalagam sliko…</string>
   <string name="log_clear">Počisti</string>
@@ -158,7 +157,6 @@
   <string name="err_acquire_image_failed">Pridobivanje slike ni uspelo.</string>
   <string name="err_tb_display">c:geo ne more prikazati željenega sledljivčka. Ali je res sledljivček?</string>
   <string name="err_tb_details_open">c:geo ne more pokazati podatke sledljivčka.</string>
-  <string name="err_tb_forgot_saw">c:geo je pozabil kateri sledljivček hočete.</string>
   <string name="err_tb_find">c:geo ni našel sledljivčka.</string>
   <string name="err_tb_find_that">c:geo ni našel tega sledljivčka.</string>
   <string name="err_waypoint_cache_unknown">c:geo ne ve h kateremu zakladu želite dodati točko.</string>
@@ -166,15 +164,11 @@
   <string name="err_point_unknown_position">c:geo ne ve kje ste.</string>
   <string name="err_point_no_position_given_title">Potrebne informacije</string>
   <string name="err_point_no_position_given">Vnesite vsaj koordinate ali pa razdaljo in smer. Izpolnete lahko tudi vsa polja.</string>
-  <string name="err_point_curr_position_unavailable">c:geo še vedno nima trenutnih koordinat. Prosimo počakajte…</string>
   <string name="err_point_bear_and_dist_title">Potrebujete pomoč?</string>
   <string name="err_point_bear_and_dist">Vnesite smer in razdaljo. Smer je kot med 0 in 360 stopinjami od severa. Razdalja je lahko z ali brez enot.</string>
   <string name="err_log_load_data">c:geo ni mogel naložiti podatkov za zapis obiska.</string>
   <string name="err_log_load_data_again">c:geo ne more naložiti podatkov za zapis obiska. Ponovni poskus…</string>
   <string name="err_log_load_data_still">c:geo še vedno nalaga podatke za zapis obiska. Prosimo počakajte še trenutek.</string>
-  <string name="err_log_post_failed">Izgleda, kot da zapis ni bil objavljen. Preverite na Geocaching.com.</string>
-  <string name="err_log_post_failed_ec">Izgleda, da vaš zapis ni bil objavljen. Preverite na Extremcaching.com.</string>
-  <string name="err_logimage_post_failed">Izgleda, kot da slika ni bila naložena. Preverite na Geocaching.com.</string>
   <string name="err_search_address_forgot">c:geo je pozabil naslov, ki ste ga hoteli najti.</string>
   <string name="err_parse_lat">c:geo ni razumel geografske širine.</string>
   <string name="err_parse_lon">c:geo ni razumel geografske dolžine.</string>
@@ -271,9 +265,7 @@
   <string name="caches_nearby">V bližini</string>
   <string name="caches_manage">Upravljaj</string>
   <string name="caches_remove_all">Odstrani vse</string>
-  <string name="caches_remove_all_confirm">Ali želite odstraniti vseh %s zakladov iz trenutnega seznama?</string>
   <string name="caches_remove_selected">Odstrani izbrane</string>
-  <string name="caches_remove_selected_confirm">Ali želite odstraniti %s označenih zakladov iz vaše naprave?</string>
   <string name="caches_remove_progress">Odstranjujem zaklade</string>
   <string name="caches_delete_events">Izbriši pretekla srečanja</string>
   <string name="caches_refresh_selected">Osveži izbrane</string>
@@ -643,7 +635,6 @@
   <string name="cache_menu_streetview">Pogled ulic</string>
   <string name="cache_menu_browser">Odpri v brskalniku</string>
   <string name="cache_menu_visit">Objavi zapis</string>
-  <string name="cache_menu_visit_offline">Shrani zapis</string>
   <string name="cache_menu_spoilers">Spoiler slike</string>
   <string name="cache_menu_around">Zakladi v bližini</string>
   <string name="cache_menu_event">Dodaj na koledar</string>

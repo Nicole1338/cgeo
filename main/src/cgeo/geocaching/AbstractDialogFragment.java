@@ -7,10 +7,10 @@ import cgeo.geocaching.activity.ActivityMixin;
 import cgeo.geocaching.enumerations.LoadFlags;
 import cgeo.geocaching.gcvote.GCVote;
 import cgeo.geocaching.gcvote.GCVoteRating;
-import cgeo.geocaching.geopoint.Geopoint;
-import cgeo.geocaching.geopoint.Units;
+import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.location.Units;
+import cgeo.geocaching.sensors.GeoData;
 import cgeo.geocaching.sensors.GeoDirHandler;
-import cgeo.geocaching.sensors.IGeoData;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.ui.CacheDetailsCreator;
 import cgeo.geocaching.ui.LoggingUI;
@@ -19,7 +19,7 @@ import cgeo.geocaching.utils.RxUtils;
 
 import rx.Observable;
 import rx.Subscription;
-import rx.android.observables.AndroidObservable;
+import rx.android.app.AppObservable;
 import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.subscriptions.Subscriptions;
@@ -187,7 +187,7 @@ public abstract class AbstractDialogFragment extends DialogFragment implements C
         if (!cache.supportsGCVote()) {
             return;
         }
-        AndroidObservable.bindActivity(getActivity(), Observable.defer(new Func0<Observable<GCVoteRating>>() {
+        AppObservable.bindActivity(getActivity(), Observable.defer(new Func0<Observable<GCVoteRating>>() {
             @Override
             public Observable<GCVoteRating> call() {
                 final GCVoteRating rating = GCVote.getRating(cache.getGuid(), geocode);
@@ -254,9 +254,9 @@ public abstract class AbstractDialogFragment extends DialogFragment implements C
     private final GeoDirHandler geoUpdate = new GeoDirHandler() {
 
         @Override
-        public void updateGeoData(final IGeoData geo) {
+        public void updateGeoData(final GeoData geo) {
             try {
-                if (geo.getCoords() != null && cache != null && cache.getCoords() != null) {
+                if (cache != null && cache.getCoords() != null) {
                     cacheDistance.setText(Units.getDistanceFromKilometers(geo.getCoords().distanceTo(cache.getCoords())));
                     cacheDistance.bringToFront();
                 }
@@ -271,7 +271,7 @@ public abstract class AbstractDialogFragment extends DialogFragment implements C
      * @param geo
      *            location
      */
-    protected void onUpdateGeoData(final IGeoData geo) {
+    protected void onUpdateGeoData(final GeoData geo) {
         // do nothing by default
     }
 

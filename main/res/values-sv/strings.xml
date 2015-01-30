@@ -17,7 +17,7 @@
   <string name="letterbox">Letterbox hybrid</string>
   <string name="event">Event cache</string>
   <string name="mega">Mega-event cache</string>
-  <string name="giga">Giga-Event Cache</string>
+  <string name="giga">Giga-Event cache</string>
   <string name="earth">Earthcache</string>
   <string name="cito">Cache in trash out event</string>
   <string name="webcam">Webcam cache</string>
@@ -74,7 +74,7 @@
   <string name="log_tb_visit">Besök</string>
   <string name="log_tb_drop">Lämna här</string>
   <string name="log_tb_changeall">Ändra alla</string>
-  <string name="log_save">Spara</string>
+  <string name="log_save">Spara offline</string>
   <string name="log_saving">Sparar logg…</string>
   <string name="log_saving_and_uploading">Sparar logg och laddar upp bild…</string>
   <string name="log_clear">Rensa</string>
@@ -125,6 +125,7 @@
   <string name="err_login">Inloggningsinformationen ej sparad</string>
   <string name="err_login_failed_toast">Tyvärr kan c:geo inte logga in. c:geo kommer att köra i offline läge med sparade cacher. Kontrollera dina inloggningsuppgifter och aktivera din internetanslutning.</string>
   <string name="err_unknown">Okänt fel</string>
+  <string name="err_unknown_address">c:geo kunde inte associera adressen till en plats</string>
   <string name="err_comm">Okänt kommunikationsfel</string>
   <string name="err_missing_auth">Användarnamn och/eller lösenord saknas.</string>
   <string name="err_wrong">Felaktiga inloggningsuppgifter</string>
@@ -159,7 +160,6 @@
   <string name="err_acquire_image_failed">Hämtning av bilden misslyckades.</string>
   <string name="err_tb_display">Tyvärr kan c:geo inte visa den trackable du önskar. Är den verkligen trackable?</string>
   <string name="err_tb_details_open">Tyvärr kan c:geo inte öppna detaljer för trackable.</string>
-  <string name="err_tb_forgot_saw">Tyvärr glömde c:geo vilken trackable du såg.</string>
   <string name="err_tb_find">Tyvärr kunde c:geo inte hitta trackable</string>
   <string name="err_tb_find_that">Tyvärr kan c:geo inte hitta önskad trackable.</string>
   <string name="err_waypoint_cache_unknown">Tyvärr vet inte c:geo till vilken cache du vill lägga till en punkt.</string>
@@ -167,15 +167,13 @@
   <string name="err_point_unknown_position">Tyvärr kan c:geo inte bestämma din position.</string>
   <string name="err_point_no_position_given_title">Mer info krävs</string>
   <string name="err_point_no_position_given">Ange minst latitud och longitud eller avstånd och riktning. Du kan också ange alla fyra.</string>
-  <string name="err_point_curr_position_unavailable">c:geo har ännu inte nuvarande koordinater. Vänta en stund…</string>
   <string name="err_point_bear_and_dist_title">Tips!</string>
   <string name="err_point_bear_and_dist">Ange både riktning och avstånd. Rikting är en vinkel mellan 0 och 360 grader relativt norr. Avstånd anges med eller utan enhet.</string>
   <string name="err_log_load_data">Tyvärr kan c:geo inte ladda information som krävs för att logga ditt besök.</string>
   <string name="err_log_load_data_again">Tyvärr kan c:geo inte ladda information som krävs för att logga ditt besök. Försöker igen.</string>
   <string name="err_log_load_data_still">c:geo laddar fortfarande data för att kunna posta loggen. Vänligen vänta en stund till.</string>
-  <string name="err_log_post_failed">Tyvärr misslyckades c:geo att posta loggen.</string>
-  <string name="err_log_post_failed_ec">Det verkar som att din logg inte kunde laddas upp. Kontrollera loggen på Extremcaching.com.</string>
-  <string name="err_logimage_post_failed">Det verkar som om din bild till loggen inte kunde laddas upp. Vänligen kontrollera den på Geocaching.com.</string>
+  <string name="err_log_post_failed">Det verkar som att din logg inte kunde postas. Kontrollera loggen på cachens ursprungliga hemsida.</string>
+  <string name="err_logimage_post_failed">Det verkar som att din logg bild inte kunde laddas upp. Kontrollera bilden på cachens hemsida.</string>
   <string name="err_search_address_forgot">Tyvärr glömde c:geo adressen du sökte efter.</string>
   <string name="err_parse_lat">Tyvärr kan c:geo inte tolka latitud.</string>
   <string name="err_parse_lon">Tyvärr kan c:geo inte tolka longitud.</string>
@@ -212,6 +210,7 @@
   <string name="loc_net">Nätverk</string>
   <string name="loc_fused">Kombinerad</string>
   <string name="loc_low_power">Strömspar</string>
+  <string name="loc_home">Hemkoordinater</string>
   <string name="loc_gps">GPS</string>
   <string name="loc_sat">Sat</string>
   <string name="loc_trying">Försöker hitta plats</string>
@@ -270,9 +269,11 @@
   <string name="caches_nearby">Nära</string>
   <string name="caches_manage">Hantera</string>
   <string name="caches_remove_all">Ta bort alla</string>
-  <string name="caches_remove_all_confirm">Vill du ta bort alla %s cacher från denna lista?</string>
+  <plurals name="caches_remove_all_confirm">
+    <item quantity="one">Vill du radera denna cachen från den här listan?</item>
+    <item quantity="other">Vill du radera dessa %d cacher från den här listan?</item>
+  </plurals>
   <string name="caches_remove_selected">Ta bort valda</string>
-  <string name="caches_remove_selected_confirm">Vill du ta bort de %s markerade cacherna från enheten?</string>
   <string name="caches_remove_progress">Tar bort cacher</string>
   <string name="caches_delete_events">Ta bort gamla event</string>
   <string name="caches_refresh_selected">Uppdatera valda</string>
@@ -297,6 +298,9 @@
   <string name="caches_filter_personal_note">Med personlig anteckning</string>
   <string name="caches_filter_popularity">Favoriter</string>
   <string name="caches_filter_popularity_ratio">Favoriter [%]</string>
+  <string name="caches_filter_personal_data">Med personlig info</string>
+  <string name="caches_filter_rating">Med betyg</string>
+  <string name="caches_filter_own_rating">Med eget betyg</string>
   <string name="caches_removing_from_history">Tar bort från historik…</string>
   <string name="caches_clear_offlinelogs">Rensa offline loggar</string>
   <string name="caches_clear_offlinelogs_message">Vill du rensa offline loggarna?</string>
@@ -322,13 +326,16 @@
   <string name="list_not_available">Listan är inte längre tillgänglig, byter till standardlistan</string>
   <string name="about_version">Version</string>
   <string name="about_changelog">Historik</string>
+  <string name="about_system">System</string>
   <string name="about_donate">Stöd c:geo</string>
   <string name="about_donation_more">Donera till\nutveckling</string>
   <string name="about_contributors">Medarbetare</string>
   <string name="about_license">Licens</string>
   <string name="about_apache_license"><a href="">Apache License, Version 2.0</a></string>
   <string name="about_help">Hjälp</string>
+  <string name="about_system_include">Vänligen inkludera följande systeminformation när du skickar en felrapport eller ber om mer information om c:geo:</string>
   <string name="settings_title_services">Tjänster</string>
+  <string name="settings_summary_services">Ställ in kontoinformation och tillgång till valbara tjänster.</string>
   <string name="settings_title_appearance">Utseende</string>
   <string name="settings_title_cachedetails">Cachedetaljer</string>
   <string name="settings_title_offlinedata">Offlinedata</string>
@@ -376,6 +383,9 @@
   <string name="settings_activate_oc_uk">Aktivera</string>
   <string name="init_oc_uk_description">Använd c:geo med opencaching.org.uk för att söka efter cacher samt för att filtrera dina funna cacher.</string>
   <string name="init_gcvote">GCvote.com</string>
+  <string name="init_gcvote_password_description">För att kunna betygsätta en cache måste du följa instruktionerna på GCVote.com och ange ditt lösenord till GCVote här.</string>
+  <string name="err_gcvote_send_rating">Fel uppstod när betyg skulle sparas, kontrollera eller ta bort lösenordet för GCVote i inställningarna.</string>
+  <string name="gcvote_sent">Röst skickades</string>
   <string name="init_twitter">Twitter</string>
   <string name="settings_activate_twitter">Aktivera</string>
   <string name="init_username">Användare</string>
@@ -647,7 +657,7 @@
   <string name="cache_menu_streetview">Gatuvy</string>
   <string name="cache_menu_browser">Öppna i webbläsare</string>
   <string name="cache_menu_visit">Logga besök</string>
-  <string name="cache_menu_visit_offline">Logga besök offline</string>
+  <string name="cache_menu_visit_offline">Snabblogga offline</string>
   <string name="cache_menu_spoilers">Spoiler bilder</string>
   <string name="cache_menu_around">Cacher i närheten</string>
   <string name="cache_menu_event">Lägg till i kalender</string>
@@ -660,6 +670,7 @@
   <string name="cache_menu_navigon">Navigon</string>
   <string name="cache_menu_pebble">Pebble</string>
   <string name="cache_menu_android_wear">Android Wear</string>
+  <string name="cache_menu_vote">Rösta</string>
   <string name="cache_status">Status</string>
   <string name="cache_status_offline_log">Sparad logg</string>
   <string name="cache_status_found">Hittad</string>

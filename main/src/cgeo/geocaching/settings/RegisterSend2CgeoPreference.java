@@ -13,7 +13,7 @@ import ch.boye.httpclientandroidlib.HttpResponse;
 import org.apache.commons.lang3.StringUtils;
 
 import rx.Observable;
-import rx.android.observables.AndroidObservable;
+import rx.android.app.AppObservable;
 import rx.functions.Action1;
 import rx.functions.Func0;
 
@@ -55,7 +55,7 @@ public class RegisterSend2CgeoPreference extends AbstractClickablePreference {
                         activity.getString(R.string.init_sendToCgeo_registering), true);
                 progressDialog.setCancelable(false);
 
-                AndroidObservable.bindActivity(activity, Observable.defer(new Func0<Observable<Integer>>() {
+                AppObservable.bindActivity(activity, Observable.defer(new Func0<Observable<Integer>>() {
                     @Override
                     public Observable<Integer> call() {
                         final String nam = StringUtils.defaultString(deviceName);
@@ -67,11 +67,13 @@ public class RegisterSend2CgeoPreference extends AbstractClickablePreference {
                         if (response != null && response.getStatusLine().getStatusCode() == 200) {
                             //response was OK
                             final String[] strings = StringUtils.split(Network.getResponseData(response), ',');
-                            Settings.setWebNameCode(nam, strings[0]);
-                            try {
-                                return Observable.just(Integer.parseInt(strings[1].trim()));
-                            } catch (final Exception e) {
-                                Log.e("RegisterSend2CgeoPreference", e);
+                            if (strings != null) {
+                                Settings.setWebNameCode(nam, strings[0]);
+                                try {
+                                    return Observable.just(Integer.parseInt(strings[1].trim()));
+                                } catch (final Exception e) {
+                                    Log.e("RegisterSend2CgeoPreference", e);
+                                }
                             }
                         }
 

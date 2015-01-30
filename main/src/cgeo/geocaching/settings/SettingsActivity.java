@@ -12,12 +12,17 @@ import cgeo.geocaching.connector.gc.GCConnector;
 import cgeo.geocaching.files.SimpleDirChooser;
 import cgeo.geocaching.maps.MapProviderFactory;
 import cgeo.geocaching.maps.interfaces.MapSource;
+import cgeo.geocaching.sensors.Sensors;
 import cgeo.geocaching.utils.DatabaseBackupUtils;
 import cgeo.geocaching.utils.DebugUtils;
 import cgeo.geocaching.utils.Log;
+import cgeo.geocaching.utils.RxUtils;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openintents.intents.FileManagerIntents;
+
+import rx.functions.Action0;
+import rx.schedulers.Schedulers;
 
 import android.app.ProgressDialog;
 import android.app.backup.BackupManager;
@@ -88,7 +93,7 @@ public class SettingsActivity extends PreferenceActivity {
         setTheme(Settings.isLightSkin() && Build.VERSION.SDK_INT > 10 ? R.style.settings_light : R.style.settings);
         super.onCreate(savedInstanceState);
 
-        initHardwareAccelerationPreferences();
+        initDeviceSpecificPreferences();
         initUnitPreferences();
         SettingsActivity.addPreferencesFromResource(this, R.xml.preferences);
         initPreferences();
@@ -277,7 +282,7 @@ public class SettingsActivity extends PreferenceActivity {
     /**
      * Fire up a directory chooser on click on the preference.
      *
-     * @see #onActivityResult() for processing of the selected directory
+     * The result can be processed using {@link android.app.Activity#onActivityResult}.
      *
      * @param dct
      *            type of directory to be selected
@@ -296,7 +301,7 @@ public class SettingsActivity extends PreferenceActivity {
             dirChooser.putExtra(FileManagerIntents.EXTRA_BUTTON_TEXT,
                     getString(android.R.string.ok));
             startActivityForResult(dirChooser, dct.requestCode);
-        } catch (final android.content.ActivityNotFoundException ignored) {
+        } catch (final ActivityNotFoundException ignored) {
             // OI file manager not available
             final Intent dirChooser = new Intent(this, SimpleDirChooser.class);
             dirChooser.putExtra(Intents.EXTRA_START_DIR, startDirectory);
@@ -322,13 +327,14 @@ public class SettingsActivity extends PreferenceActivity {
         backup.setOnPreferenceClickListener(new OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(final Preference preference) {
-                return DatabaseBackupUtils.createBackup(SettingsActivity.this, new Runnable() {
+                DatabaseBackupUtils.createBackup(SettingsActivity.this, new Runnable() {
 
                     @Override
                     public void run() {
                         VALUE_CHANGE_LISTENER.onPreferenceChange(SettingsActivity.this.getPreference(R.string.pref_fakekey_preference_backup_info), "");
                     }
                 });
+                return true;
             }
         });
 
@@ -353,22 +359,20 @@ public class SettingsActivity extends PreferenceActivity {
                 final Resources res = getResources();
                 final SettingsActivity activity = SettingsActivity.this;
                 final ProgressDialog dialog = ProgressDialog.show(activity, res.getString(R.string.init_maintenance), res.getString(R.string.init_maintenance_directories), true, false);
-                new Thread() {
+                RxUtils.andThenOnUi(Schedulers.io(), new Action0() {
                     @Override
-                    public void run() {
+                    public void call() {
                         DataStore.removeObsoleteCacheDirectories();
-                        activity.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                dialog.dismiss();
-                            }
-                        });
                     }
-                }.start();
-
+                }, new Action0() {
+                    @Override
+                    public void call() {
+                        dialog.dismiss();
+                    }
+                });
                 return true;
-            }
-        });
+                }
+            });
 		final Preference memoryDumpPref = getPreference(R.string.pref_memory_dump);
 		memoryDumpPref
 				.setOnPreferenceClickListener(new OnPreferenceClickListener() {
@@ -381,10 +385,11 @@ public class SettingsActivity extends PreferenceActivity {
                 });
     }
 
-    public static void initHardwareAccelerationPreferences() {
-        // We have to ensure that the preference is initialized so that devices with hardware acceleration disabled
-        // get the appropriate value.
+    public static void initDeviceSpecificPreferences() {
+        // We have to ensure that those preferences are initialized so that devices with specific default values
+        // will get the appropriate ones.
         Settings.setUseHardwareAcceleration(Settings.useHardwareAcceleration());
+        Settings.setUseGooglePlayServices(Settings.useGooglePlayServices());
     }
 
     private static void initUnitPreferences() {
@@ -418,11 +423,12 @@ public class SettingsActivity extends PreferenceActivity {
     }
 
     private void initGeoDirPreferences() {
+        final Sensors sensors = Sensors.getInstance();
         final Preference playServices = getPreference(R.string.pref_googleplayservices);
         playServices.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(final Preference preference, final Object newValue) {
-                CgeoApplication.getInstance().setupGeoDataObservables((Boolean) newValue, Settings.useLowPowerMode());
+                sensors.setupGeoDataObservables((Boolean) newValue, Settings.useLowPowerMode());
                 return true;
             }
         });
@@ -430,10 +436,9 @@ public class SettingsActivity extends PreferenceActivity {
         getPreference(R.string.pref_lowpowermode).setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(final Preference preference, final Object newValue) {
-                final CgeoApplication app = CgeoApplication.getInstance();
                 final Boolean useLowPower = (Boolean) newValue;
-                app.setupGeoDataObservables(Settings.useGooglePlayServices(), useLowPower);
-                app.setupDirectionObservable(useLowPower);
+                sensors.setupGeoDataObservables(Settings.useGooglePlayServices(), useLowPower);
+                sensors.setupDirectionObservable(useLowPower);
                 return true;
             }
         });
@@ -702,8 +707,6 @@ public class SettingsActivity extends PreferenceActivity {
 
     /**
      * auto-care for the summary of the preference of string type with this key
-     *
-     * @param key
      */
     private void bindSummaryToStringValue(final int key) {
 

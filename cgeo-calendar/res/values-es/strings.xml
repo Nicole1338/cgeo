@@ -3,6 +3,6 @@
 <resources>
   <string name="app_name">c:geo - calendario (complemento)</string>
   <string name="calendars">Calendarios</string>
-  <string name="event_success">Escondite/Evento añadido al calendario</string>
-  <string name="event_fail">Error al añadir escondite/evento al calendario</string>
+  <string name="event_success">Evento añadido al calendario</string>
+  <string name="event_fail">Error al añadir el evento al calendario</string>
 </resources>
