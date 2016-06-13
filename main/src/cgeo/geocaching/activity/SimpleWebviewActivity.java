@@ -1,5 +1,7 @@
 package cgeo.geocaching.activity;
 
+import butterknife.ButterKnife;
+
 import cgeo.geocaching.R;
 
 import android.annotation.SuppressLint;
@@ -11,7 +13,7 @@ public class SimpleWebviewActivity extends AbstractActionBarActivity {
 
     private WebView webview;
 
-    class SimplelWebviewClient extends WebViewClient {
+    class SimpleWebviewClient extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(final WebView view, final String url) {
             webview.loadUrl(url);
@@ -24,9 +26,9 @@ public class SimpleWebviewActivity extends AbstractActionBarActivity {
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState, R.layout.internal_browser);
 
-        webview = (WebView) findViewById(R.id.webview);
+        webview = ButterKnife.findById(this, R.id.webview);
         webview.getSettings().setJavaScriptEnabled(true);
-        webview.setWebViewClient(new SimplelWebviewClient());
+        webview.setWebViewClient(new SimpleWebviewClient());
         webview.loadUrl(String.valueOf(getIntent().getData()));
     }
 }

@@ -24,17 +24,16 @@
 # jackson internal references
 -dontwarn org.w3c.dom.bootstrap.DOMImplementationRegistry
 
+# this does not exist on jdk6 and is only loaded dynamically by jackson if needed
+-dontwarn java.nio.file.Path*
+
 #-dontnote org.apache.commons.logging.**
 
 -keep class cgeo.geocaching.** { *; }
 -keep class android.support.v4.os.** { *; }
 
--keep class ch.boye.httpclientandroidlib.conn.scheme.Scheme { *; }
--keep class ch.boye.httpclientandroidlib.params.HttpParams { *; }
--keep class ch.boye.httpclientandroidlib.client.HttpClient { *; }
--dontnote ch.boye.httpclientandroidlib.**
--dontwarn ch.boye.httpclientandroidlib.impl.auth.NegotiateScheme
 -dontwarn  org.springframework.**
+-dontwarn org.tukaani.xz.**
 
 -keepclasseswithmembers class * {
     public <init>(android.content.Context, android.util.AttributeSet);
@@ -72,9 +71,18 @@
 -keep class org.apache.commons.io.FileUtils { *; }
 
 # action providers are only referenced from XML
+-keep public class android.support.v7.widget.ShareActionProvider { *; }
 -keep public class cgeo.geocaching.sorting.SortActionProvider { *; }
 -keep public class cgeo.geocaching.ui.NavigationActionProvider { *; }
--keep public class cgeo.geocaching.apps.cache.navi.NavigationSelectionActionProvider  { *; }
+-keep public class cgeo.geocaching.apps.navi.NavigationSelectionActionProvider  { *; }
 
 # Play Service references to classes introduced in higher API levels
 -dontwarn com.google.android.gms.**
+
+# OkHttp references unused classes
+-dontwarn java.nio.file.*
+-dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+# new mapsforge
+-dontwarn com.caverock.androidsvg.R$styleable
+-dontwarn com.caverock.androidsvg.R
+-dontwarn org.kxml2.io.KXmlParser

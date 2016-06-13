@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="cgeo.geocaching"
-    android:installLocation="auto"
-    android:versionCode="20121203"
-    android:versionName="developer build" >
+    android:installLocation="auto">
 
     <uses-sdk
         android:minSdkVersion="9"
         android:targetSdkVersion="21" />
-
+    
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -40,7 +38,9 @@
         android:icon="@drawable/cgeo"
         android:label="@string/app_name"
         android:theme="@style/cgeo"
-        android:hardwareAccelerated="false">
+        android:hardwareAccelerated="false"
+        android:supportsRtl="true"
+        android:largeHeap="true">
         <uses-library
             android:name="com.google.android.maps"
             android:required="false" />
@@ -81,6 +81,9 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+                
+                <!-- ProcessPhoenix uses the default flag to recognize which activity to use after restart -->
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
         <activity
@@ -208,7 +211,9 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
+                <category android:name="android.intent.category.ALTERNATIVE" />
+                <category android:name="android.intent.category.SELECTED_ALTERNATIVE" />
+                
                 <data android:mimeType="*/*" />
                 <data android:scheme="file" />
                 <data android:host="*" />
@@ -219,12 +224,71 @@
                 <data android:pathPattern=".*\\..*\\..*\\..*\\.gpx" />
                 <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.gpx" />
             </intent-filter>
+            
+            <!-- intent filter for all gpx links, independent of mime types -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.gpx" />
+                <data android:pathPattern=".*\\..*\\.gpx" />
+                <data android:pathPattern=".*\\..*\\..*\\.gpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.gpx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.gpx" />
+            </intent-filter>
+            
+            <!-- intent filter for local ggz files -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
 
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.ALTERNATIVE" />
+                <category android:name="android.intent.category.SELECTED_ALTERNATIVE" />
+                
+                <data android:mimeType="*/*" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.ggz" />
+                <!-- path pattern does not match dots correctly: http://stackoverflow.com/q/3400072/44089 -->
+                <data android:pathPattern=".*\\..*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\..*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.ggz" />
+            </intent-filter>
+            
+            <!-- intent filter for GGZ links, independent of mime types -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\..*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.ggz" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.ggz" />
+            </intent-filter>
+            
+
+            <!-- intent filter for ZIP files -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.ALTERNATIVE" />
+                <category android:name="android.intent.category.SELECTED_ALTERNATIVE" />
+                
                 <data android:mimeType="text/xml" />
                 <data android:mimeType="application/xml" />
                 <data android:mimeType="application/zip" />
@@ -234,6 +298,7 @@
                 <data android:mimeType="application/octet-stream" />
                 <data android:pathPattern=".*\\.gpx" />
                 <data android:pathPattern=".*\\.zip" />
+                <data android:pathPattern=".*\\.ggz" />
             </intent-filter>
         </activity>
         <activity
@@ -250,7 +315,7 @@
             android:label="@string/map_map" >
         </activity>
         <activity
-            android:name=".maps.mapsforge.v024.MapsforgeMapActivity024"
+            android:name=".maps.mapsforge.v6.NewMap"
             android:label="@string/map_map" >
         </activity>
         <activity
@@ -265,6 +330,21 @@
             android:name=".LogTrackableActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:label="@string/trackable_touch" >
+
+            <!-- GeoKrety.org QRCode-->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="geokrety.org" />
+                <data android:host="www.geokrety.org" />
+                <data android:pathPrefix="/m/qr.php" />
+            </intent-filter>
         </activity>
         <activity
             android:name=".ImagesActivity"
@@ -280,6 +360,8 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            
+            <!-- extremcaching.com -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -287,11 +369,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="coord.info"
-                    android:pathPrefix="/GC"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="extremcaching.com" />
+                <data android:host="www.extremcaching.com" />
+                <data android:pathPrefix="/index.php/output-2/" />
             </intent-filter>
+
+            <!-- geocaching.com URL via coord.info redirection -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -299,11 +384,15 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.geocaching.com"
-                    android:pathPrefix="/geocache/GC"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="coord.info" />
+                <data android:host="www.coord.info" />
+                <data android:pathPrefix="/GC" />
+                <data android:pathPrefix="/gc" />
             </intent-filter>
+
+            <!-- geocaching.com -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -311,11 +400,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="geocaching.com"
-                    android:pathPrefix="/seek/cache_details.aspx"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="geocaching.com" />
+                <data android:host="www.geocaching.com" />
+                <data android:pathPrefix="/seek/cache_details.aspx" />
+                <data android:pathPrefix="/geocache/GC" />
+                <data android:pathPrefix="/geocache/gc" />
             </intent-filter>
+
+            <!-- opencaching.CZ -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -323,11 +417,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.geocaching.com"
-                    android:pathPrefix="/seek/cache_details.aspx"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.cz" />
+                <data android:host="www.opencaching.cz" />
+                <data android:pathPrefix="/OZ" />
+                <data android:pathPrefix="/oz" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
+
+            <!-- opencaching.DE -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -335,11 +434,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="opencaching.de"
-                    android:pathPrefix="/OC"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.de" />
+                <data android:host="www.opencaching.de" />
+                <data android:pathPrefix="/OC" />
+                <data android:pathPrefix="/oc" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
+
+            <!-- opencaching.ES -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -347,11 +451,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.opencaching.de"
-                    android:pathPrefix="/OC"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencachingspain.es" />
+                <data android:host="www.opencachingspain.es" />
+                <data android:pathPrefix="/OC" />
+                <data android:pathPrefix="/oc" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
+
+            <!-- opencaching.FR -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -359,11 +468,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.opencaching.de"
-                    android:pathPrefix="/viewcache.php"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.fr" />
+                <data android:host="www.opencaching.fr" />
+                <data android:pathPrefix="/OC" />
+                <data android:pathPrefix="/oc" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
+
+            <!-- opencaching.IT -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -371,11 +485,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="opencaching.fr"
-                    android:pathPrefix="/OC"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.it" />
+                <data android:host="www.opencaching.it" />
+                <data android:pathPrefix="/OC" />
+                <data android:pathPrefix="/oc" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
+
+            <!-- opencaching.NO -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -383,11 +502,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.opencaching.fr"
-                    android:pathPrefix="/OC"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.no" />
+                <data android:host="www.opencaching.no" />
+                <data android:pathPrefix="/OC" />
+                <data android:pathPrefix="/oc" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
+
+            <!-- opencaching.NL -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -395,12 +519,84 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.opencaching.fr"
-                    android:pathPrefix="/viewcache.php"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.nl" />
+                <data android:host="www.opencaching.nl" />
+                <data android:pathPrefix="/OB" />
+                <data android:pathPrefix="/ob" />
+                <data android:pathPrefix="/viewcache.php" />
+            </intent-filter>
+
+            <!-- opencaching.PL -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.pl" />
+                <data android:host="www.opencaching.pl" />
+                <data android:pathPrefix="/OP" />
+                <data android:pathPrefix="/op" />
+                <data android:pathPrefix="/viewcache.php" />
+            </intent-filter>
+
+            <!-- opencaching.ORG.UK -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.org.uk" />
+                <data android:host="www.opencaching.org.uk" />
+                <data android:pathPrefix="/OK" />
+                <data android:pathPrefix="/ok" />
+                <data android:pathPrefix="/viewcache.php" />
+            </intent-filter>
+
+            <!-- opencaching.RO -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.ro" />
+                <data android:host="www.opencaching.ro" />
+                <data android:pathPrefix="/OR" />
+                <data android:pathPrefix="/or" />
+                <data android:pathPrefix="/viewcache.php" />
+            </intent-filter>
+
+            <!-- opencaching.US -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="opencaching.us" />
+                <data android:host="www.opencaching.us" />
+                <data android:pathPrefix="/OU" />
+                <data android:pathPrefix="/ou" />
+                <data android:pathPrefix="/viewcache.php" />
             </intent-filter>
         </activity>
+
         <activity
             android:name="cgeo.geocaching.TrackableActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
@@ -414,22 +610,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="coord.info"
-                    android:pathPrefix="/TB"
-                    android:scheme="http" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="www.coord.info"
-                    android:pathPrefix="/TB"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="coord.info" />
+                <data android:host="www.coord.info" />
+                <data android:pathPrefix="/TB" />
+                <data android:pathPrefix="/tb" />
             </intent-filter>
 
             <!-- TravelBug URL tracking page -->
@@ -440,11 +626,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="geocaching.com"
-                    android:pathPrefix="/track/details.aspx"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="geocaching.com" />
+                <data android:host="www.geocaching.com" />
+                <data android:pathPrefix="/track/details.aspx" />
             </intent-filter>
+
+            <!-- GeoKrety.org -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -452,13 +641,15 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="www.geocaching.com"
-                    android:pathPrefix="/track/details.aspx"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="geokrety.org" />
+                <data android:host="www.geokrety.org" />
+                <data android:pathPrefix="/konkret.php" />
+                <data android:pathPrefix="/m/qr.php" />
             </intent-filter>
 
-            <!-- GeoKrety URLs -->
+            <!-- GeoKretyMap.org -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />
@@ -466,49 +657,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data
-                    android:host="geokrety.org"
-                    android:pathPrefix="/konkret.php"
-                    android:scheme="http" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="www.geokrety.org"
-                    android:pathPrefix="/konkret.php"
-                    android:scheme="http" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="geokretymap.org" />
+                <data android:host="www.geokretymap.org" />
+                <data android:pathPrefix="/GK" />
+                <data android:pathPrefix="/gk" />
             </intent-filter>
 
-            <!--
-            Geokrety QR code URLs, not yet implemented
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="geokrety.org"
-                    android:pathPrefix="/m/qr.php"
-                    android:scheme="http" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="www.geokrety.org"
-                    android:pathPrefix="/m/qr.php"
-                    android:scheme="http" />
-            </intent-filter>
-            -->
         </activity>
         <activity
             android:name=".CompassActivity"
@@ -585,15 +741,78 @@
 
         </activity>
 
-        <!-- provide enhanced meta data for caches (and waypoints) when invoking Locus from c:geo -->
-        <provider
-            android:name="menion.android.locus.LocusDataStorageProvider"
-            android:authorities="cgeo.geocaching.apps.locusdatastorageprovider" />
+        <activity
+            android:name=".filter.FilterActivity_"
+            android:label="@string/caches_filter_title" >
+        </activity>
+
+        <activity
+            android:name="cgeo.geocaching.connector.trackable.GeokretyAuthorizationActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="stateHidden" >
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="cgeo.geocaching.settings.GCAuthorizationActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="stateHidden" >
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="cgeo.geocaching.settings.ECAuthorizationActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="stateHidden" >
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="cgeo.geocaching.settings.GCVoteAuthorizationActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="stateHidden" >
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <!-- search suggestions for the search bar at the top -->
         <provider
             android:name=".search.SuggestionProvider"
             android:authorities="cgeo.geocaching.search.SuggestionProvider" />
+        
+        <activity
+            android:name="cgeo.geocaching.connector.gc.PocketQueryListActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:label="@string/search_pocket_title"
+            android:parentActivityName="cgeo.geocaching.MainActivity"            >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="cgeo.geocaching.MainActivity" />
+        </activity>
+        
     </application>
 
 </manifest>

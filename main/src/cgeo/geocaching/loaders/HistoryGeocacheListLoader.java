@@ -1,6 +1,6 @@
 package cgeo.geocaching.loaders;
 
-import cgeo.geocaching.DataStore;
+import cgeo.geocaching.storage.DataStore;
 import cgeo.geocaching.SearchResult;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.location.Geopoint;
@@ -11,7 +11,7 @@ import android.content.Context;
 public class HistoryGeocacheListLoader extends AbstractSearchLoader {
     private final Geopoint coords;
 
-    public HistoryGeocacheListLoader(Context context, Geopoint coords) {
+    public HistoryGeocacheListLoader(final Context context, final Geopoint coords) {
         super(context);
         this.coords = coords;
     }

@@ -1,16 +1,15 @@
 package cgeo.geocaching.maps;
 
 import cgeo.geocaching.CachePopup;
-import cgeo.geocaching.DataStore;
-import cgeo.geocaching.Geocache;
-import cgeo.geocaching.IWaypoint;
 import cgeo.geocaching.R;
 import cgeo.geocaching.WaypointPopup;
 import cgeo.geocaching.activity.Progress;
 import cgeo.geocaching.connector.gc.GCMap;
 import cgeo.geocaching.enumerations.CacheType;
+import cgeo.geocaching.enumerations.CoordinatesType;
 import cgeo.geocaching.enumerations.LoadFlags;
 import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.location.IConversion;
 import cgeo.geocaching.maps.interfaces.CachesOverlayItemImpl;
 import cgeo.geocaching.maps.interfaces.GeoPointImpl;
 import cgeo.geocaching.maps.interfaces.ItemizedOverlayImpl;
@@ -18,7 +17,10 @@ import cgeo.geocaching.maps.interfaces.MapItemFactory;
 import cgeo.geocaching.maps.interfaces.MapProjectionImpl;
 import cgeo.geocaching.maps.interfaces.MapProvider;
 import cgeo.geocaching.maps.interfaces.MapViewImpl;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.IWaypoint;
 import cgeo.geocaching.settings.Settings;
+import cgeo.geocaching.storage.DataStore;
 import cgeo.geocaching.utils.Log;
 
 import org.apache.commons.lang3.StringUtils;
@@ -43,13 +45,13 @@ public class CachesOverlay extends AbstractItemizedOverlay {
     private List<CachesOverlayItemImpl> items = new ArrayList<>();
     private Context context = null;
     private boolean displayCircles = false;
-    private Progress progress = new Progress();
+    private final Progress progress = new Progress();
     private Paint blockedCircle = null;
     private PaintFlagsDrawFilter setFilter = null;
     private PaintFlagsDrawFilter removeFilter = null;
     private MapItemFactory mapItemFactory = null;
 
-    public CachesOverlay(ItemizedOverlayImpl ovlImpl, Context contextIn) {
+    public CachesOverlay(final ItemizedOverlayImpl ovlImpl, final Context contextIn) {
         super(ovlImpl);
 
         populate();
@@ -60,19 +62,19 @@ public class CachesOverlay extends AbstractItemizedOverlay {
         mapItemFactory = mapProvider.getMapItemFactory();
     }
 
-    void updateItems(CachesOverlayItemImpl item) {
-        List<CachesOverlayItemImpl> itemsPre = new ArrayList<>();
+    void updateItems(final CachesOverlayItemImpl item) {
+        final List<CachesOverlayItemImpl> itemsPre = new ArrayList<>();
         itemsPre.add(item);
 
         updateItems(itemsPre);
     }
 
-    void updateItems(List<CachesOverlayItemImpl> itemsPre) {
+    void updateItems(final List<CachesOverlayItemImpl> itemsPre) {
         if (itemsPre == null) {
             return;
         }
 
-        for (CachesOverlayItemImpl item : itemsPre) {
+        for (final CachesOverlayItemImpl item : itemsPre) {
             item.setMarker(boundCenterBottom(item.getMarker(0)));
         }
 
@@ -97,7 +99,7 @@ public class CachesOverlay extends AbstractItemizedOverlay {
     }
 
     @Override
-    public void draw(Canvas canvas, MapViewImpl mapView, boolean shadow) {
+    public void draw(final Canvas canvas, final MapViewImpl mapView, final boolean shadow) {
 
         drawInternal(canvas, mapView.getMapProjection());
 
@@ -105,15 +107,15 @@ public class CachesOverlay extends AbstractItemizedOverlay {
     }
 
     @Override
-    public void drawOverlayBitmap(Canvas canvas, Point drawPosition,
-            MapProjectionImpl projection, byte drawZoomLevel) {
+    public void drawOverlayBitmap(final Canvas canvas, final Point drawPosition,
+            final MapProjectionImpl projection, final byte drawZoomLevel) {
 
         drawInternal(canvas, projection);
 
         super.drawOverlayBitmap(canvas, drawPosition, projection, drawZoomLevel);
     }
 
-    private void drawInternal(Canvas canvas, MapProjectionImpl projection) {
+    private void drawInternal(final Canvas canvas, final MapProjectionImpl projection) {
         if (!displayCircles || items.isEmpty()) {
             return;
         }
@@ -129,7 +131,7 @@ public class CachesOverlay extends AbstractItemizedOverlay {
             final int radius = calculateDrawingRadius(projection);
             final Point center = new Point();
 
-            for (CachesOverlayItemImpl item : items) {
+            for (final CachesOverlayItemImpl item : items) {
                 if (item.applyDistanceRule()) {
                     final Geopoint itemCoord = item.getCoord().getCoords();
                     final GeoPointImpl itemGeo = mapItemFactory.getGeoPointBase(itemCoord);
@@ -154,15 +156,13 @@ public class CachesOverlay extends AbstractItemizedOverlay {
     }
 
     /**
-     * calculate the radius of the circle to be drawn for the first item only. Those circles are only 161 meters in
-     * reality and therefore the minor changes due to the projection will not make any visible difference at the zoom
-     * levels which are used to see the circles.
+     * Calculate the radius of the circle to be drawn for the first item only. Those circles are only 528 feet
+     * (approximately 161 meters) in reality and therefore the minor changes due to the projection will not make any
+     * visible difference at the zoom levels which are used to see the circles.
      *
-     * @param projection
-     * @return
      */
-    private int calculateDrawingRadius(MapProjectionImpl projection) {
-        float[] distanceArray = new float[1];
+    private int calculateDrawingRadius(final MapProjectionImpl projection) {
+        final float[] distanceArray = new float[1];
         final Geopoint itemCoord = items.get(0).getCoord().getCoords();
 
         Location.distanceBetween(itemCoord.getLatitude(), itemCoord.getLongitude(),
@@ -172,7 +172,7 @@ public class CachesOverlay extends AbstractItemizedOverlay {
         final GeoPointImpl itemGeo = mapItemFactory.getGeoPointBase(itemCoord);
 
         final Geopoint leftCoords = new Geopoint(itemCoord.getLatitude(),
-                itemCoord.getLongitude() - 161 / longitudeLineDistance);
+                itemCoord.getLongitude() - 528.0 * IConversion.FEET_TO_KILOMETER * 1000.0 / longitudeLineDistance);
         final GeoPointImpl leftGeo = mapItemFactory.getGeoPointBase(leftCoords);
 
         final Point center = new Point();
@@ -202,7 +202,7 @@ public class CachesOverlay extends AbstractItemizedOverlay {
     }
 
     @Override
-    public boolean onTap(int index) {
+    public boolean onTap(final int index) {
 
         try {
             if (items.size() <= index) {
@@ -227,12 +227,12 @@ public class CachesOverlay extends AbstractItemizedOverlay {
             }
 
             final IWaypoint coordinate = item.getCoord();
-            final String coordType = coordinate.getCoordType();
+            final CoordinatesType coordType = coordinate.getCoordType();
 
-            if (StringUtils.equalsIgnoreCase(coordType, "cache") && StringUtils.isNotBlank(coordinate.getGeocode())) {
+            if (coordType == CoordinatesType.CACHE && StringUtils.isNotBlank(coordinate.getGeocode())) {
                 final Geocache cache = DataStore.loadCache(coordinate.getGeocode(), LoadFlags.LOAD_CACHE_OR_DB);
                 if (cache != null) {
-                    RequestDetailsThread requestDetailsThread = new RequestDetailsThread(cache);
+                    final RequestDetailsThread requestDetailsThread = new RequestDetailsThread(cache);
                     if (!requestDetailsThread.requestRequired()) {
                         // don't show popup if we have enough details
                         progress.dismiss();
@@ -244,7 +244,7 @@ public class CachesOverlay extends AbstractItemizedOverlay {
                 return false;
             }
 
-            if (StringUtils.equalsIgnoreCase(coordType, "waypoint") && coordinate.getId() >= 0) {
+            if (coordType == CoordinatesType.WAYPOINT && coordinate.getId() >= 0) {
                 CGeoMap.markCacheAsDirty(coordinate.getGeocode());
                 WaypointPopup.startActivity(context, coordinate.getId(), coordinate.getGeocode());
             } else {
@@ -253,7 +253,7 @@ public class CachesOverlay extends AbstractItemizedOverlay {
             }
 
             progress.dismiss();
-        } catch (NotFoundException e) {
+        } catch (final NotFoundException e) {
             Log.e("CachesOverlay.onTap", e);
             progress.dismiss();
         }
@@ -262,10 +262,10 @@ public class CachesOverlay extends AbstractItemizedOverlay {
     }
 
     @Override
-    public CachesOverlayItemImpl createItem(int index) {
+    public CachesOverlayItemImpl createItem(final int index) {
         try {
             return items.get(index);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             Log.e("CachesOverlay.createItem", e);
         }
 
@@ -274,25 +274,19 @@ public class CachesOverlay extends AbstractItemizedOverlay {
 
     @Override
     public int size() {
-        try {
-            return items.size();
-        } catch (Exception e) {
-            Log.e("CachesOverlay.size", e);
-        }
-
-        return 0;
+        return items.size();
     }
 
     private class RequestDetailsThread extends Thread {
 
-        private final @NonNull Geocache cache;
+        @NonNull private final Geocache cache;
 
-        public RequestDetailsThread(final @NonNull Geocache cache) {
+        RequestDetailsThread(@NonNull final Geocache cache) {
             this.cache = cache;
         }
 
         public boolean requestRequired() {
-            return CacheType.UNKNOWN == cache.getType() || cache.getDifficulty() == 0;
+            return cache.getType() == CacheType.UNKNOWN || cache.getDifficulty() == 0;
         }
 
         @Override

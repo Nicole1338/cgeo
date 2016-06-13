@@ -2,51 +2,51 @@
 <resources>
   <!-- changelog for the release branch -->
   <string name="changelog_release" translatable="false">\n
-    <b>Next release</b>\n
-    · Fix: Crash exporting GPX for lab caches\n
-    · Fix: Crash restoring non-existing database backup\n
+    <b>2016.06.09:</b>\n
+    · Fix: Lab caches imported from GPX may overwrite other lab caches\n
+    · Fix: Only first log image was shown in logbook\n
     \n
     \n
-    <b>2015.01.20:</b>\n
-    · Fix: Nearby search for basic members not working in some cases\n
-    · Fix: On change of OSM map it was not centered to the current location\n
-    · Fix: Better handling for caches with high amount of pictures\n
-    · Fix: Rare crash if TB can not be found\n
-    · Fix: Possible crash in case GooglePlay location services are not working as expected\n
-    · Fictitious: This app will auto-solve all Mysterys\n
+    <b>2016.05.09:</b>\n
+    · Fix: Spoiler images not downloaded\n
     \n
     \n
-    <b>2015.01.12:</b>\n
-    · New: Waypoints created from personal notes can now be deleted\n
-    · New: More easy to use GCVote dialog in cache details\n
-    · New: Add system information in \"About\" page and support mails\n
-    · New: Improved NFC handling and support retrieval of cache and trackable URLs via NFC\n
-    · New: Use alternate source to display the location on homescreen if Google fails\n
-    · New: Improve refresh speed by skipping static map loading if download limit is reached\n
-    · New: Live map will now open at last position if follow function is not active\n
-    · Fix: Arrow on map not shown on some devices\n
-    · Fix: Compass working erratically on some devices\n
-    · Fix: Batch refresh of caches without progress\n
-    · Fix: Cache logs and pictures could be mixed up after batch refresh\n
-    · Fix: Major rework of spanish translation\n
-    · Fix: Menu for scanning trackable and geocache codes wrongly hidden\n
-    · Fix: Up navigation did not work when c:geo was invoked from another app\n
-    · Fix: Rare crash when performing a backup of the cache database\n
-    · Fix: Rare crash when refreshing cache lists\n
-    · Fix: Use phone language instead of country when requesting opencaching data\n
-    · Fix: Recognize Sygic voucher edition\n
-    · Fix: Update locally stored GCVote when sending over network\n
-    · Fix: Clearing of a cache only attribute is not recorded into the database\n
-    · Fix: Improve usability by lowering timeout for network requests\n
-     \n
-     \n    
-    <b>Known Limitations/Bugs:</b>\n
-    · Device menu button not working on map popup\n
-      Please use the three dot button instead\n
-    · Live map:\n
-      Approximated coords due to limitations on the GC-website\n
-      Be aware: If navigation is started directly from live map it may also use the approximated coords!\n
-      In fast mode the cache type might be wrong in rare cases\n
-      On low zoom owned/found caches may not be hidden anymore\n
+    <b>2016.04.12:</b>\n
+    · Fix: Text selection from cache description no longer working on some devices\n
+    · Fix: Translation menu sometimes missing after selecting text\n
+    · Fix: Found status of webcam caches not shown\n
+    · Fix: Avatar not shown on login check if it was not a jpeg\n
+    · Fix: Own coords not updated in waypoint screen\n
+    · Fix: Twitter NUMBER template showing wrong find count\n
+    · Fix: Terain filter was going up to T7.5\n
+    \n
+    \n
+    <b>2016.03.06:</b>\n
+    · New: Select parts of the cache description text for sharing\n
+    · New: Invite friends to use c:geo directly from the app\n
+    · New: Use https for communication with Geokrety\n
+    · New: Support links encoded in some GeoKrety QRCode\n
+    · New: Filter for caches found last 30 days\n
+    · New: Support GeoLutins trackables\n
+    · New: Allow to change header coords locally for Letterbox and Wherigo caches\n
+    · New: Show generation date and remaining days for pocket queries\n
+    · Change: Encrypted log entries are shown encrypted initially\n
+    · Fix: Waypoints imported correctly for GPX from geocheck.org\n
+    · Fix: Hide export menu if list does not contain exportable caches\n
+    · Fix: Hide showcase for hint in compass if no hint is available for that cache\n
+    · Fix: Inconsistency in descriptions of user created waypoints\n
+    · Fix: Don\'t show unknown attribute icons for opencaching.org.uk\n
+    · Fix: Import pocket queries from bookmark lists with umlauts\n
+    · Fix: Show progress indication on logging page while information is loaded in the background\n
+    · Fix: Allow searching for trackable secret codes starting with GC\n
+    · Fix: Do not leave the app when selecting back in spoiler view\n
+    · Fix: Hint picture not refreshed when switching to different cache\n
+    · Fix: Implemented workaround to show horizontal lines from HTML\n
+    · Fix: List of PQ also shown if none of them is downloadable\n
+    · Fix: Caches with final waypoints predefined (e.g. challenges) will have final marker on map\n
+    · Fix: Correct error message if basic member tries to open PM-only cache\n
+    · Fix: Nearby result can not be sorted by \"Hidden date\"\n
+    \n
+    \n
 </string>
 </resources>

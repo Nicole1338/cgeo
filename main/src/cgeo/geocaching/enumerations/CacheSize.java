@@ -3,7 +3,9 @@ package cgeo.geocaching.enumerations;
 import cgeo.geocaching.CgeoApplication;
 import cgeo.geocaching.R;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -24,6 +26,7 @@ public enum CacheSize {
     OTHER("Other", 8, R.string.cache_size_other, "other"),
     UNKNOWN("Unknown", -1, R.string.cache_size_unknown, ""); // CacheSize not init. yet
 
+    @NonNull
     public final String id;
     public final int comparable;
     private final int stringId;
@@ -32,35 +35,41 @@ public enum CacheSize {
      */
     private final String ocSize2;
 
-    CacheSize(final String id, final int comparable, final int stringId, final String ocSize2) {
+    CacheSize(@NonNull final String id, final int comparable, final int stringId, final String ocSize2) {
         this.id = id;
         this.comparable = comparable;
         this.stringId = stringId;
         this.ocSize2 = ocSize2;
     }
 
-    final private static Map<String, CacheSize> FIND_BY_ID = new HashMap<>();
+    @NonNull
+    private static final Map<String, CacheSize> FIND_BY_ID = new HashMap<>();
     static {
         for (final CacheSize cs : values()) {
             FIND_BY_ID.put(cs.id.toLowerCase(Locale.US), cs);
-            FIND_BY_ID.put(cs.ocSize2.toLowerCase(Locale.US), cs);
+            if (StringUtils.isNotBlank(cs.ocSize2)) {
+                FIND_BY_ID.put(cs.ocSize2.toLowerCase(Locale.US), cs);
+            }
+            // also add the size icon names of the website
+            final String imageName = StringUtils.replace(StringUtils.lowerCase(cs.id), " ", "_");
+            FIND_BY_ID.put(imageName, cs);
         }
         // add medium as additional string for Regular
-        FIND_BY_ID.put("medium", CacheSize.REGULAR);
+        FIND_BY_ID.put("medium", REGULAR);
     }
 
     @NonNull
-    public static CacheSize getById(final String id) {
+    public static CacheSize getById(@Nullable final String id) {
         if (id == null) {
             return UNKNOWN;
         }
         // avoid String operations for performance reasons
-        final CacheSize result = CacheSize.FIND_BY_ID.get(id);
+        final CacheSize result = FIND_BY_ID.get(id);
         if (result != null) {
             return result;
         }
         // only if String was not found, normalize it
-        final CacheSize resultNormalized = CacheSize.FIND_BY_ID.get(id.toLowerCase(Locale.US).trim());
+        final CacheSize resultNormalized = FIND_BY_ID.get(id.toLowerCase(Locale.US).trim());
         if (resultNormalized != null) {
             return resultNormalized;
         }
@@ -87,6 +96,7 @@ public enum CacheSize {
         return UNKNOWN;
     }
 
+    @NonNull
     public final String getL10n() {
         return CgeoApplication.getInstance().getBaseContext().getResources().getString(stringId);
     }

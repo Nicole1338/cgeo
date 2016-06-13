@@ -1,26 +1,25 @@
 package cgeo.geocaching.ui.logs;
 
-import butterknife.InjectView;
-
-import cgeo.geocaching.R;
-import cgeo.geocaching.ui.AbstractViewHolder;
-
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import butterknife.BindView;
+import cgeo.geocaching.R;
+import cgeo.geocaching.ui.AbstractViewHolder;
+
 public class LogViewHolder extends AbstractViewHolder {
-    @InjectView(R.id.added) protected TextView date ;
-    @InjectView(R.id.type) protected TextView type;
-    @InjectView(R.id.author) protected TextView author;
-    @InjectView(R.id.count_or_location) protected TextView countOrLocation;
-    @InjectView(R.id.log) protected TextView text;
-    @InjectView(R.id.log_images) protected TextView images;
-    @InjectView(R.id.log_mark) protected ImageView marker;
+    @BindView(R.id.added) protected TextView date ;
+    @BindView(R.id.type) protected TextView type;
+    @BindView(R.id.author) protected TextView author;
+    @BindView(R.id.count_or_location) protected TextView countOrLocation;
+    @BindView(R.id.log) protected TextView text;
+    @BindView(R.id.log_images) protected TextView images;
+    @BindView(R.id.log_mark) protected ImageView marker;
 
     private int position;
 
-    public LogViewHolder(View rowView) {
+    public LogViewHolder(final View rowView) {
         super(rowView);
     }
 

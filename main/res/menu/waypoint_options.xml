@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
-    
+    xmlns:app="http://schemas.android.com/apk/res-auto" >
+
     <item
         android:id="@+id/menu_waypoint_reset_cache_coords"
         android:title="@string/waypoint_reset_cache_coords">
@@ -9,6 +9,10 @@
     <item
         android:id="@+id/menu_waypoint_edit"
         android:title="@string/waypoint_edit">
+    </item>
+    <item
+        android:id="@+id/menu_waypoint_copy_coordinates"
+        android:title="@string/waypoint_copy_coordinates">
     </item>
     <item
         android:id="@+id/menu_waypoint_duplicate"
@@ -30,4 +34,5 @@
         android:id="@+id/menu_waypoint_caches_around"
         android:title="@string/cache_menu_around">
     </item>
+
 </menu>

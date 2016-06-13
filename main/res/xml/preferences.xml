@@ -6,8 +6,8 @@
     <PreferenceScreen
         android:icon="?attr/settings_cloud"
         android:key="@string/preference_screen_services"
-        android:title="@string/settings_title_services"
-        android:summary="@string/settings_summary_services">
+        android:summary="@string/settings_summary_services"
+        android:title="@string/settings_title_services" >
         <PreferenceCategory android:title="@string/settings_category_geocaching" >
             <PreferenceScreen
                 android:key="@string/preference_screen_gc"
@@ -22,28 +22,15 @@
                         app:url="@string/settings_gc_legal_note_url"
                         app:urlButton="@string/settings_goto_url_button" />
 
-                    <EditTextPreference
+                    <cgeo.geocaching.settings.TextPreference
                         android:dependency="@string/pref_connectorGCActive"
-                        android:dialogTitle="@string/init_username"
-                        android:hint="@string/init_username"
-                        android:imeOptions="actionDone"
-                        android:key="@string/pref_username"
-                        android:singleLine="true"
-                        android:title="@string/init_username" />
+                        android:layout="@layout/text_preference"
+                        android:text="@string/settings_gc_description" />
 
-                    <cgeo.geocaching.settings.EditPasswordPreference
+                    <cgeo.geocaching.settings.CredentialsPreference
                         android:dependency="@string/pref_connectorGCActive"
-                        android:dialogTitle="@string/init_password"
-                        android:hint="@string/init_password"
-                        android:imeOptions="actionDone"
-                        android:inputType="textPassword"
-                        android:key="@string/pref_password"
-                        android:singleLine="true"
-                        android:title="@string/init_password" />
-
-                    <cgeo.geocaching.settings.CheckGcCredentialsPreference
-                        android:dependency="@string/pref_connectorGCActive"
-                        android:title="@string/init_login" />
+                        android:summary="@string/auth_unconnected"
+                        android:key="@string/pref_fakekey_gc_authorization" />
 
                     <PreferenceScreen
                         android:dependency="@string/pref_connectorGCActive"
@@ -62,10 +49,6 @@
                     </PreferenceScreen>
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="GC" />
-
                     <cgeo.geocaching.settings.InfoPreference
                         android:text="@string/settings_info_facebook_login"
                         android:title="@string/settings_info_facebook_login_title"
@@ -75,6 +58,10 @@
                     <Preference
                         android:key="@string/pref_fakekey_gc_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="GC" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -84,6 +71,7 @@
                     <CheckBoxPreference
                         android:defaultValue="false"
                         android:key="@string/pref_connectorOCActive"
+                        android:summary="@string/init_summary_oc_de"
                         android:title="@string/settings_activate_oc" />
 
                     <cgeo.geocaching.settings.TextPreference
@@ -96,13 +84,14 @@
                         android:key="@string/pref_fakekey_ocde_authorization" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OC" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ocde_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="OC" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -112,6 +101,7 @@
                     <CheckBoxPreference
                         android:defaultValue="false"
                         android:key="@string/pref_connectorOCPLActive"
+                        android:summary="@string/init_summary_oc_pl"
                         android:title="@string/settings_activate_oc_pl" />
 
                     <cgeo.geocaching.settings.TextPreference
@@ -124,13 +114,14 @@
                         android:key="@string/pref_fakekey_ocpl_authorization" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OP" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ocpl_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="OP" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -140,6 +131,7 @@
                     <CheckBoxPreference
                         android:defaultValue="false"
                         android:key="@string/pref_connectorOCNLActive"
+                        android:summary="@string/init_summary_oc_nl"
                         android:title="@string/settings_activate_oc_nl" />
 
                     <cgeo.geocaching.settings.TextPreference
@@ -152,13 +144,14 @@
                         android:key="@string/pref_fakekey_ocnl_authorization" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OB" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ocnl_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="OB" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -168,6 +161,7 @@
                     <CheckBoxPreference
                         android:defaultValue="false"
                         android:key="@string/pref_connectorOCUSActive"
+                        android:summary="@string/init_summary_oc_us"
                         android:title="@string/settings_activate_oc_us" />
 
                     <cgeo.geocaching.settings.TextPreference
@@ -180,13 +174,14 @@
                         android:key="@string/pref_fakekey_ocus_authorization" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OU" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ocus_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="OU" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -196,6 +191,7 @@
                     <CheckBoxPreference
                         android:defaultValue="false"
                         android:key="@string/pref_connectorOCROActive"
+                        android:summary="@string/init_summary_oc_ro"
                         android:title="@string/settings_activate_oc_ro" />
 
                     <cgeo.geocaching.settings.TextPreference
@@ -208,13 +204,14 @@
                         android:key="@string/pref_fakekey_ocro_authorization" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OR" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ocro_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="OR" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -224,6 +221,7 @@
                     <CheckBoxPreference
                         android:defaultValue="false"
                         android:key="@string/pref_connectorOCUKActive"
+                        android:summary="@string/init_summary_oc_uk"
                         android:title="@string/settings_activate_oc_uk" />
 
                     <cgeo.geocaching.settings.TextPreference
@@ -236,13 +234,14 @@
                         android:key="@string/pref_fakekey_ocuk_authorization" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OK" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ocuk_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="OK" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -254,28 +253,16 @@
                         android:key="@string/pref_connectorECActive"
                         android:title="@string/settings_activate_ec" />
 
-                    <EditTextPreference
+                    <cgeo.geocaching.settings.TextPreference
                         android:dependency="@string/pref_connectorECActive"
-                        android:dialogTitle="@string/init_username"
-                        android:hint="@string/init_username"
-                        android:imeOptions="actionDone"
-                        android:key="@string/pref_ecusername"
-                        android:singleLine="true"
-                        android:title="@string/init_username" />
+                        android:layout="@layout/text_preference"
+                        android:text="@string/settings_ec_description" />
 
-                    <cgeo.geocaching.settings.EditPasswordPreference
+                    <cgeo.geocaching.settings.CredentialsPreference
                         android:dependency="@string/pref_connectorECActive"
-                        android:dialogTitle="@string/init_password"
-                        android:hint="@string/init_password"
-                        android:imeOptions="actionDone"
-                        android:inputType="textPassword"
-                        android:key="@string/pref_ecpassword"
-                        android:singleLine="true"
-                        android:title="@string/init_password" />
+                        android:summary="@string/auth_unconnected"
+                        android:key="@string/pref_fakekey_ec_authorization" />
 
-                    <cgeo.geocaching.settings.CheckECCredentialsPreference
-                        android:dependency="@string/pref_connectorECActive"
-                        android:title="@string/init_login" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_title_appearance" >
                     <ListPreference
@@ -288,32 +275,36 @@
                         android:title="@string/init_ec_icons" />
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="EC" />
 
                     <Preference
                         android:key="@string/pref_fakekey_ec_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="EC" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
-                android:key="@string/preference_screen_ox"
-                android:title="@string/settings_title_ox" >
+                android:key="@string/preference_screen_su"
+                android:title="@string/init_su" >
                 <PreferenceCategory android:title="@string/settings_settings" >
                     <CheckBoxPreference
                         android:defaultValue="false"
-                        android:key="@string/pref_connectorOXActive"
-                        android:title="@string/settings_activate_ox" />
+                        android:key="@string/pref_connectorSUActive"
+                        android:summary="@string/init_summary_su"
+                        android:title="@string/settings_activate_su" />
+
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
-                    <cgeo.geocaching.settings.CapabilitiesPreference
-                        android:title="@string/settings_features"
-                        app:connector="OX" />
 
                     <Preference
-                        android:key="@string/pref_fakekey_ox_website"
+                        android:key="@string/pref_fakekey_su_website"
                         android:title="@string/settings_open_website" />
+
+                    <cgeo.geocaching.settings.CapabilitiesPreference
+                        android:title="@string/settings_features"
+                        app:connector="SU" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -331,20 +322,56 @@
                         android:layout="@layout/text_preference"
                         android:text="@string/init_gcvote_password_description" />
 
-                    <cgeo.geocaching.settings.EditPasswordPreference
+                    <cgeo.geocaching.settings.CredentialsPreference
                         android:dependency="@string/pref_ratingwanted"
-                        android:dialogTitle="@string/init_password"
-                        android:hint="@string/init_password"
-                        android:imeOptions="actionDone"
-                        android:inputType="textPassword"
-                        android:key="@string/pref_pass_vote"
-                        android:singleLine="true"
-                        android:title="@string/init_password" />
+                        android:summary="@string/auth_unconnected"
+                        android:key="@string/pref_fakekey_gcvote_authorization" />
+
                 </PreferenceCategory>
                 <PreferenceCategory android:title="@string/settings_information" >
+
                     <Preference
                         android:key="@string/pref_fakekey_gcvote_website"
                         android:title="@string/settings_open_website" />
+                </PreferenceCategory>
+            </PreferenceScreen>
+            <PreferenceScreen
+                android:key="@string/preference_screen_geokrety"
+                android:title="@string/init_geokrety" >
+                <PreferenceCategory android:title="@string/settings_settings" >
+                    <CheckBoxPreference
+                        android:defaultValue="false"
+                        android:key="@string/pref_connectorGeokretyActive"
+                        android:summary="@string/init_summary_geokrety"
+                        android:title="@string/settings_activate_geokrety" />
+
+                    <cgeo.geocaching.settings.TextPreference
+                        android:dependency="@string/pref_connectorGeokretyActive"
+                        android:layout="@layout/text_preference"
+                        android:text="@string/init_geokrety_description" />
+
+                    <cgeo.geocaching.settings.TokenPreference
+                        android:dependency="@string/pref_connectorGeokretyActive"
+                        android:key="@string/pref_fakekey_geokrety_authorization" />
+                </PreferenceCategory>
+                <PreferenceCategory android:title="@string/settings_advanced" >
+                    <CheckBoxPreference
+                        android:dependency="@string/pref_connectorGeokretyActive"
+                        android:defaultValue="true"
+                        android:key="@string/pref_geokrety_cache"
+                        android:title="@string/init_geokrety_cache" />
+
+                    <cgeo.geocaching.settings.TextPreference
+                        android:layout="@layout/text_preference"
+                        android:text="@string/init_geokrety_cache_description" />
+                </PreferenceCategory>
+                <PreferenceCategory android:title="@string/settings_information" >
+                    <Preference
+                        android:key="@string/pref_fakekey_geokrety_website"
+                        android:title="@string/settings_open_website" />
+                    <Preference
+                        android:key="@string/pref_fakekey_geokretymap_website"
+                        android:title="@string/settings_open_geokretymap_website" />
                 </PreferenceCategory>
             </PreferenceScreen>
             <PreferenceScreen
@@ -377,30 +404,33 @@
             <PreferenceScreen
                 android:key="@string/preference_screen_twitter"
                 android:title="@string/init_twitter" >
-                <CheckBoxPreference
-                    android:defaultValue="false"
-                    android:key="@string/pref_twitter"
-                    android:title="@string/settings_activate_twitter" />
+                <PreferenceCategory android:title="@string/settings_settings" >
+                    <CheckBoxPreference
+                        android:defaultValue="false"
+                        android:key="@string/pref_twitter"
+                        android:title="@string/settings_activate_twitter" />
 
-                <cgeo.geocaching.settings.TextPreference
-                    android:dependency="@string/pref_twitter"
-                    android:layout="@layout/text_preference"
-                    android:text="@string/about_twitter" />
+                    <cgeo.geocaching.settings.TextPreference
+                        android:dependency="@string/pref_twitter"
+                        android:layout="@layout/text_preference"
+                        android:text="@string/about_twitter" />
 
-                <cgeo.geocaching.settings.OAuthPreference
-                    android:dependency="@string/pref_twitter"
-                    android:key="@string/pref_fakekey_twitter_authorization" />
-
-                <cgeo.geocaching.settings.TemplateTextPreference
-                    android:defaultValue="I found [NAME] ([URL])."
-                    android:dependency="@string/pref_twitter"
-                    android:key="@string/pref_twitter_cache_message"
-                    android:title="@string/settings_twitter_cache_message" />
-                <cgeo.geocaching.settings.TemplateTextPreference
-                    android:defaultValue="I touched [NAME] ([URL])."
-                    android:dependency="@string/pref_twitter"
-                    android:key="@string/pref_twitter_trackable_message"
-                    android:title="@string/settings_twitter_trackable_message" />
+                    <cgeo.geocaching.settings.OAuthPreference
+                        android:dependency="@string/pref_twitter"
+                        android:key="@string/pref_fakekey_twitter_authorization" />
+                </PreferenceCategory>
+                <PreferenceCategory android:title="@string/settings_advanced" >
+                    <cgeo.geocaching.settings.TemplateTextPreference
+                        android:defaultValue="I found [NAME] ([URL])."
+                        android:dependency="@string/pref_twitter"
+                        android:key="@string/pref_twitter_cache_message"
+                        android:title="@string/settings_twitter_cache_message" />
+                    <cgeo.geocaching.settings.TemplateTextPreference
+                        android:defaultValue="I touched [NAME] ([URL])."
+                        android:dependency="@string/pref_twitter"
+                        android:key="@string/pref_twitter_trackable_message"
+                        android:title="@string/settings_twitter_trackable_message" />
+                </PreferenceCategory>
             </PreferenceScreen>
         </PreferenceCategory>
         <PreferenceCategory android:title="@string/settings_category_browser" >
@@ -412,9 +442,10 @@
         </PreferenceCategory>
     </PreferenceScreen>
     <PreferenceScreen
-        android:key="@string/pref_appearance"
         android:icon="?attr/settings_eye"
-        android:title="@string/settings_title_appearance" >
+        android:key="@string/pref_appearance"
+        android:title="@string/settings_title_appearance"
+        android:summary="@string/settings_summary_appearance" >
         <CheckBoxPreference
             android:defaultValue="false"
             android:key="@string/pref_skin"
@@ -443,12 +474,8 @@
     </PreferenceScreen>
     <PreferenceScreen
         android:icon="?attr/settings_details"
-        android:title="@string/settings_title_cachedetails" >
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="@string/pref_autoloaddesc"
-            android:summary="@string/init_summary_autoload"
-            android:title="@string/init_autoload" />
+        android:title="@string/settings_title_cachedetails"
+        android:summary="@string/settings_summary_cachedetails" >
         <CheckBoxPreference
             android:defaultValue="true"
             android:key="@string/pref_friendlogswanted"
@@ -477,7 +504,8 @@
     </PreferenceScreen>
     <PreferenceScreen
         android:icon="?attr/settings_map"
-        android:title="@string/settings_title_map" >
+        android:title="@string/settings_title_map"
+        android:summary="@string/settings_summary_map" >
         <PreferenceCategory android:title="@string/settings_title_map_data" >
             <ListPreference
                 android:defaultValue="0"
@@ -523,6 +551,11 @@
 
             <CheckBoxPreference
                 android:defaultValue="true"
+                android:key="@string/pref_map_direction"
+                android:summary="@string/settings_summary_map_direction"
+                android:title="@string/settings_map_direction" />
+            <CheckBoxPreference
+                android:defaultValue="false"
                 android:key="@string/pref_maptrail"
                 android:summary="@string/init_summary_maptrail"
                 android:title="@string/init_maptrail" />
@@ -530,7 +563,8 @@
     </PreferenceScreen>
     <PreferenceScreen
         android:icon="?attr/settings_pen"
-        android:title="@string/settings_title_logging" >
+        android:title="@string/settings_title_logging"
+        android:summary="@string/settings_summary_logging" >
         <PreferenceCategory android:title="@string/init_signature" >
             <cgeo.geocaching.settings.TemplateTextPreference
                 android:key="@string/pref_signature"
@@ -556,7 +590,8 @@
     </PreferenceScreen>
     <PreferenceScreen
         android:icon="?attr/settings_sdcard"
-        android:title="@string/settings_title_offlinedata" >
+        android:title="@string/settings_title_offlinedata"
+        android:summary="@string/settings_summary_offlinedata" >
         <CheckBoxPreference
             android:defaultValue="true"
             android:key="@string/pref_offlinemaps"
@@ -580,7 +615,8 @@
     </PreferenceScreen>
     <PreferenceScreen
         android:icon="?attr/settings_arrow"
-        android:title="@string/settings_title_navigation" >
+        android:title="@string/settings_title_navigation"
+        android:summary="@string/settings_summary_navigation" >
         <PreferenceCategory android:title="@string/init_default_navigation_tool" >
             <cgeo.geocaching.settings.TextPreference
                 android:layout="@layout/text_preference"
@@ -591,6 +627,7 @@
                 android:dialogTitle="@string/init_default_navigation_tool_select"
                 android:key="@string/pref_defaultNavigationTool"
                 android:title="@string/init_default_navigation_tool_select" />
+            <!-- default value is NavigationAppFactory.NavigationAppsEnum.COMPASS -->
         </PreferenceCategory>
         <PreferenceCategory android:title="@string/init_secondary_navigation_tool" >
             <cgeo.geocaching.settings.TextPreference
@@ -598,10 +635,11 @@
                 android:text="@string/init_default_navigation_tool_2_description" />
 
             <ListPreference
-                android:defaultValue="0"
+                android:defaultValue="2"
                 android:dialogTitle="@string/init_default_navigation_tool_select"
                 android:key="@string/pref_defaultNavigationTool2"
                 android:title="@string/init_default_navigation_tool_select" />
+            <!-- default value is NavigationAppFactory.NavigationAppsEnum.INTERNAL_MAP -->
         </PreferenceCategory>
         <PreferenceCategory android:title="@string/settings_title_navigation_menu" >
             <cgeo.geocaching.settings.TextPreference
@@ -626,6 +664,11 @@
                     android:enabled="false"
                     android:key="@string/pref_navigation_menu_internal_map"
                     android:title="@string/cache_menu_map" />
+                <CheckBoxPreference
+                    android:defaultValue="true"
+                    android:enabled="false"
+                    android:key="@string/pref_navigation_menu_internal_new_map"
+                    android:title="@string/cache_menu_new_map" />
                 <CheckBoxPreference
                     android:defaultValue="true"
                     android:enabled="false"
@@ -665,7 +708,12 @@
                     android:defaultValue="true"
                     android:enabled="false"
                     android:key="@string/pref_navigation_menu_oruxmaps"
-                    android:title="@string/cache_menu_oruxmaps" />
+                    android:title="@string/cache_menu_oruxmaps_online" />
+                <CheckBoxPreference
+                    android:defaultValue="true"
+                    android:enabled="false"
+                    android:key="@string/pref_navigation_menu_oruxmaps_offline"
+                    android:title="@string/cache_menu_oruxmaps_offline" />
                 <CheckBoxPreference
                     android:defaultValue="true"
                     android:enabled="false"
@@ -674,13 +722,23 @@
                 <CheckBoxPreference
                     android:defaultValue="true"
                     android:enabled="false"
-                    android:key="@string/pref_navigation_menu_sygic"
-                    android:title="@string/cache_menu_sygic" />
+                    android:key="@string/pref_navigation_menu_sygic_walking"
+                    android:title="@string/cache_menu_sygic_walk" />
+                <CheckBoxPreference
+                    android:defaultValue="true"
+                    android:enabled="false"
+                    android:key="@string/pref_navigation_menu_sygic_driving"
+                    android:title="@string/cache_menu_sygic_drive" />
                 <CheckBoxPreference
                     android:defaultValue="true"
                     android:enabled="false"
                     android:key="@string/pref_navigation_menu_google_walk"
                     android:title="@string/cache_menu_navigation_walk" />
+                <CheckBoxPreference
+                    android:defaultValue="true"
+                    android:enabled="false"
+                    android:key="@string/pref_navigation_menu_google_transit"
+                    android:title="@string/cache_menu_navigation_transit" />
                 <CheckBoxPreference
                     android:defaultValue="true"
                     android:enabled="false"
@@ -716,7 +774,8 @@
     </PreferenceScreen>
     <PreferenceScreen
         android:icon="?attr/settings_nut"
-        android:title="@string/settings_title_system" >
+        android:title="@string/settings_title_system"
+        android:summary="@string/settings_summary_system" >
         <PreferenceCategory android:title="@string/settings_title_gpx" >
             <Preference
                 android:key="@string/pref_gpxExportDir"
@@ -757,7 +816,7 @@
                 android:key="@string/pref_fakekey_preference_maintenance_directories"
                 android:title="@string/init_maintenance_directories" />
         </PreferenceCategory>
-        <PreferenceCategory android:title="@string/init_location">
+        <PreferenceCategory android:title="@string/init_location" >
             <cgeo.geocaching.settings.TextPreference
                 android:layout="@layout/text_preference"
                 android:text="@string/init_location_note" />
@@ -767,16 +826,27 @@
                 android:key="@string/pref_googleplayservices"
                 android:title="@string/init_location_googleplayservices" />
         </PreferenceCategory>
-        <PreferenceCategory android:title="@string/init_low_power">
+        <PreferenceCategory android:title="@string/init_low_power" >
             <cgeo.geocaching.settings.TextPreference
                 android:layout="@layout/text_preference"
                 android:text="@string/init_low_power_note" />
+
             <CheckBoxPreference
                 android:defaultValue="false"
                 android:key="@string/pref_lowpowermode"
                 android:title="@string/init_low_power_mode" />
         </PreferenceCategory>
-        <PreferenceCategory android:title="@string/init_hardware_acceleration_title">
+        <PreferenceCategory android:title="@string/init_force_orientation_sensor_title">
+            <cgeo.geocaching.settings.TextPreference
+                android:layout="@layout/text_preference"
+                android:text="@string/init_force_orientation_sensor_note" />
+
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="@string/pref_force_orientation_sensor"
+                android:title="@string/init_force_orientation_sensor" />
+        </PreferenceCategory>
+        <PreferenceCategory android:title="@string/init_hardware_acceleration_title" >
             <cgeo.geocaching.settings.TextPreference
                 android:layout="@layout/text_preference"
                 android:text="@string/init_hardware_acceleration_note" />
@@ -794,10 +864,17 @@
                 android:defaultValue="false"
                 android:key="@string/pref_debug"
                 android:title="@string/init_debug" />
+
             <Preference
                 android:key="@string/pref_memory_dump"
                 android:title="@string/init_create_memory_dump" />
         </PreferenceCategory>
-    </PreferenceScreen>
+        <PreferenceCategory android:title="@string/init_experimental_title" >
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="@string/pref_new_map_as_default"
+                android:title="@string/init_newmap" />
+        </PreferenceCategory>
+</PreferenceScreen>
 
 </PreferenceScreen>

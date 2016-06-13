@@ -6,6 +6,10 @@ import java.util.Locale;
  * Formatting of Geopoint.
  */
 public class GeopointFormatter {
+    private GeopointFormatter() {
+        // utility class
+    }
+
     /**
      * Predefined formats.
      */
@@ -41,7 +45,7 @@ public class GeopointFormatter {
         LON_DECMINUTE,
 
         /** Example: "W 5 12,345" */
-        LON_DECMINUTE_RAW;
+        LON_DECMINUTE_RAW
     }
 
     /**

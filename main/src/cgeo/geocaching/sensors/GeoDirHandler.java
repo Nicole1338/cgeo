@@ -1,6 +1,9 @@
 package cgeo.geocaching.sensors;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.eclipse.jdt.annotation.NonNull;
+
+import java.util.concurrent.TimeUnit;
 
 import rx.Observable;
 import rx.Subscription;
@@ -8,8 +11,6 @@ import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.functions.Func2;
 import rx.subscriptions.CompositeSubscription;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * GeoData and Direction handler.
@@ -24,10 +25,10 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class GeoDirHandler {
 
-    public static final int UPDATE_GEODATA = 1 << 1;
-    public static final int UPDATE_DIRECTION = 1 << 2;
-    public static final int UPDATE_GEODIR = 1 << 3;
-    public static final int LOW_POWER = 1 << 4;
+    public static final int UPDATE_GEODATA = 1 << 0;
+    public static final int UPDATE_DIRECTION = 1 << 1;
+    public static final int UPDATE_GEODIR = 1 << 2;
+    public static final int LOW_POWER = 1 << 3;
 
     /**
      * Update method called when new geodata is available. This method is called on the UI thread.
@@ -57,11 +58,11 @@ public abstract class GeoDirHandler {
      * If the device goes fast enough, or if the compass use is not enabled in the settings,
      * the GPS direction information will be used instead of the compass one.
      */
-    public void updateGeoDir(final GeoData geoData, final float direction) {
+    public void updateGeoDir(@NonNull final GeoData geoData, final float direction) {
     }
 
     private static <T> Observable<T> throttleIfNeeded(final Observable<T> observable, final long windowDuration, final TimeUnit unit) {
-        return windowDuration > 0 ? observable.throttleFirst(windowDuration, unit) : observable;
+        return (windowDuration > 0 ? observable.throttleFirst(windowDuration, unit) : observable).onBackpressureLatest();
     }
 
     /**
@@ -104,13 +105,13 @@ public abstract class GeoDirHandler {
             }));
         }
         if ((flags & UPDATE_GEODIR) != 0) {
-            // combineOnLatest() does not implement backpressure handling, so we need to explicitely use a backpressure operator there.
+            // combineOnLatest() does not implement backpressure handling, so we need to explicitly use a backpressure operator there.
             subscriptions.add(throttleIfNeeded(Observable.combineLatest(sensors.geoDataObservable(lowPower), sensors.directionObservable(), new Func2<GeoData, Float, ImmutablePair<GeoData, Float>>() {
                 @Override
                 public ImmutablePair<GeoData, Float> call(final GeoData geoData, final Float direction) {
                     return ImmutablePair.of(geoData, direction);
                 }
-            }), windowDuration, unit).onBackpressureDrop().observeOn(AndroidSchedulers.mainThread()).subscribe(new Action1<ImmutablePair<GeoData, Float>>() {
+            }), windowDuration, unit).onBackpressureLatest().observeOn(AndroidSchedulers.mainThread()).subscribe(new Action1<ImmutablePair<GeoData, Float>>() {
                 @Override
                 public void call(final ImmutablePair<GeoData, Float> geoDir) {
                     updateGeoDir(geoDir.left, geoDir.right);

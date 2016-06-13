@@ -1,8 +1,11 @@
 package cgeo.geocaching.enumerations;
 
-import cgeo.geocaching.R;
-
 import android.content.res.Resources;
+import android.support.annotation.StringRes;
+
+import org.eclipse.jdt.annotation.NonNull;
+
+import cgeo.geocaching.R;
 
 public enum StatusCode {
 
@@ -11,6 +14,7 @@ public enum StatusCode {
     LOGIN_PARSE_ERROR(R.string.err_parse),
     CONNECTION_FAILED(R.string.err_server),
     CONNECTION_FAILED_EC(R.string.err_server_ec),
+    CONNECTION_FAILED_GK(R.string.err_server_gk),
     NO_LOGIN_INFO_STORED(R.string.err_login),
     UNKNOWN_ERROR(R.string.err_unknown),
     COMMUNICATION_ERROR(R.string.err_comm),
@@ -18,25 +22,31 @@ public enum StatusCode {
     UNAPPROVED_LICENSE(R.string.err_license),
     UNVALIDATED_ACCOUNT(R.string.err_unvalidated_account),
     UNPUBLISHED_CACHE(R.string.err_unpublished),
+    CACHE_NOT_FOUND(R.string.err_cache_not_found),
     PREMIUM_ONLY(R.string.err_premium_only),
     MAINTENANCE(R.string.err_maintenance),
     LOG_POST_ERROR(R.string.err_log_post_failed),
+    LOG_POST_ERROR_EC(R.string.err_log_post_failed_ec),
+    LOG_POST_ERROR_GK(R.string.err_log_post_failed_gk),
     NO_LOG_TEXT(R.string.warn_log_text_fill),
     NOT_LOGGED_IN(R.string.init_login_popup_failed),
     LOGIMAGE_POST_ERROR(R.string.err_logimage_post_failed);
 
-    final private int error_string;
+    @StringRes
+    private final int errorString;
 
-    StatusCode(final int error_string) {
-        this.error_string = error_string;
+    StatusCode(@StringRes final int errorString) {
+        this.errorString = errorString;
     }
 
+    @StringRes
     public int getErrorString() {
-        return error_string;
+        return errorString;
     }
 
+    @NonNull
     public String getErrorString(final Resources res) {
-        return res.getString(error_string);
+        return res.getString(errorString);
     }
 
 }

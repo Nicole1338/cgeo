@@ -1,11 +1,15 @@
 package cgeo.geocaching.utils;
 
 import cgeo.geocaching.CgeoApplication;
+import cgeo.geocaching.R;
+import cgeo.geocaching.activity.ActivityMixin;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -23,8 +27,6 @@ public final class ProcessUtils {
     /**
      * Preferred method to detect the availability of an external app
      *
-     * @param packageName
-     * @return
      */
     public static boolean isLaunchable(@Nullable final String packageName) {
         return getLaunchIntent(packageName) != null;
@@ -35,8 +37,6 @@ public final class ProcessUtils {
      * This function is relatively costly, so if you know that the package in question has
      * a launch intent, use isLaunchable() instead.
      *
-     * @param packageName
-     * @return
      */
     public static boolean isInstalled(@NonNull final String packageName) {
         return isLaunchable(packageName) || hasPackageInstalled(packageName);
@@ -73,7 +73,7 @@ public final class ProcessUtils {
         }
     }
 
-    public static boolean isIntentAvailable(final String intent) {
+    public static boolean isIntentAvailable(@NonNull final String intent) {
         return isIntentAvailable(intent, null);
     }
 
@@ -104,6 +104,30 @@ public final class ProcessUtils {
         final List<ResolveInfo> servicesList = packageManager.queryIntentServices(intent,
                 PackageManager.MATCH_DEFAULT_ONLY);
         return CollectionUtils.isNotEmpty(list) || CollectionUtils.isNotEmpty(servicesList);
+    }
+
+    @SuppressWarnings("deprecation")
+    public static void openMarket(final Activity activity, @NonNull final String packageName) {
+        try {
+            final String url = "market://details?id=" + packageName;
+            final Intent marketIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            marketIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+            activity.startActivity(marketIntent);
+
+        } catch (final RuntimeException ignored) {
+            // market not available, fall back to browser
+            final String uri = "http://play.google.com/store/apps/details?id=" + packageName;
+            openUri(uri, activity);
+        }
+    }
+
+    public static void openUri(@NonNull final String uri, @NonNull final Activity activity) {
+        try {
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(uri)));
+        } catch (final ActivityNotFoundException e) {
+            Log.e("Cannot find suitable activity", e);
+            ActivityMixin.showToast(activity, R.string.err_application_no);
+        }
     }
 
 }

@@ -11,8 +11,8 @@ import android.view.View;
  */
 public abstract class AbstractViewHolder {
 
-    protected AbstractViewHolder(View view) {
-        ButterKnife.inject(this, view);
+    protected AbstractViewHolder(final View view) {
+        ButterKnife.bind(this, view);
         view.setTag(this);
     }
 

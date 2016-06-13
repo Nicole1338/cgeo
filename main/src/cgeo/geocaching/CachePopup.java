@@ -5,6 +5,7 @@ import cgeo.geocaching.activity.ActivityMixin;
 
 import org.apache.commons.lang3.StringUtils;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -22,20 +23,20 @@ public class CachePopup extends AbstractActivity {
         // DialogFragment.show() will take care of adding the fragment
         // in a transaction.  We also want to remove any currently showing
         // dialog, so make our own transaction and take care of that here.
-        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        Fragment prev = getSupportFragmentManager().findFragmentByTag("dialog");
+        final FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        final Fragment prev = getSupportFragmentManager().findFragmentByTag("dialog");
         if (prev != null) {
             ft.remove(prev);
         }
         ft.addToBackStack(null);
 
         // Create and show the dialog.
-        DialogFragment newFragment = CachePopupFragment.newInstance(geocode);
+        final DialogFragment newFragment = CachePopupFragment.newInstance(geocode);
         newFragment.show(ft, "dialog");
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
         this.setTheme(ActivityMixin.getDialogTheme());
@@ -55,9 +56,17 @@ public class CachePopup extends AbstractActivity {
         showDialog();
     }
 
-    public static void startActivity(Context context, String geocode) {
+    public static void startActivity(final Context context, final String geocode) {
         final Intent popupIntent = new Intent(context, CachePopup.class);
         popupIntent.putExtra(Intents.EXTRA_GEOCODE, geocode);
+
         context.startActivity(popupIntent);
+    }
+
+    public static void startActivityAllowTarget(final Activity activity, final String geocode) {
+        final Intent popupIntent = new Intent(activity, CachePopup.class);
+        popupIntent.putExtra(Intents.EXTRA_GEOCODE, geocode);
+
+        activity.startActivityForResult(popupIntent, AbstractDialogFragment.REQUEST_CODE_TARGET_INFO);
     }
 }

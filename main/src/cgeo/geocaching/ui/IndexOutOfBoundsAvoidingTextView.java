@@ -6,50 +6,66 @@ import android.widget.TextView;
 
 /**
  * Jelly beans can crash when calculating the layout of a textview.
- * 
+ *
  * https://code.google.com/p/android/issues/detail?id=35466
  *
  */
 public class IndexOutOfBoundsAvoidingTextView extends TextView {
 
-    public IndexOutOfBoundsAvoidingTextView(Context context, AttributeSet attrs, int defStyle) {
-		super(context, attrs, defStyle);
-	}
+    public IndexOutOfBoundsAvoidingTextView(final Context context, final AttributeSet attrs, final int defStyle) {
+        super(context, attrs, defStyle);
+        shouldWindowFocusWait = false;
+    }
 
-	public IndexOutOfBoundsAvoidingTextView(Context context, AttributeSet attrs) {
-		super(context, attrs);
-	}
+    public IndexOutOfBoundsAvoidingTextView(final Context context, final AttributeSet attrs) {
+        super(context, attrs);
+        shouldWindowFocusWait = false;
+    }
 
-	public IndexOutOfBoundsAvoidingTextView(Context context) {
-		super(context);
-	}
+    public IndexOutOfBoundsAvoidingTextView(final Context context) {
+        super(context);
+        shouldWindowFocusWait = false;
+    }
 
-	@Override
-	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		try{
-			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        } catch (IndexOutOfBoundsException ignored) {
-			setText(getText().toString());
-			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-		}
-	}
+    @Override
+    protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
+        try {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        } catch (final IndexOutOfBoundsException ignored) {
+            setText(getText().toString());
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
+    }
 
-	@Override
-	public void setGravity(int gravity){
-		try{
-			super.setGravity(gravity);
-        } catch (IndexOutOfBoundsException ignored) {
-			setText(getText().toString());
-			super.setGravity(gravity);
-		}
-	}
+    @Override
+    public void setGravity(final int gravity) {
+        try {
+            super.setGravity(gravity);
+        } catch (final IndexOutOfBoundsException ignored) {
+            setText(getText().toString());
+            super.setGravity(gravity);
+        }
+    }
 
-	@Override
-	public void setText(CharSequence text, BufferType type) {
-		try{
-			super.setText(text, type);
-        } catch (IndexOutOfBoundsException ignored) {
-			setText(text.toString());
-		}
-	}
+    @Override
+    public void setText(final CharSequence text, final BufferType type) {
+        try {
+            super.setText(text, type);
+        } catch (final IndexOutOfBoundsException ignored) {
+            setText(text.toString());
+        }
+    }
+
+    // https://code.google.com/p/android/issues/detail?id=23381
+    private boolean shouldWindowFocusWait;
+    public void setWindowFocusWait(final boolean shouldWindowFocusWait) {
+        this.shouldWindowFocusWait = shouldWindowFocusWait;
+    }
+
+    @Override
+    public void onWindowFocusChanged(final boolean hasWindowFocus) {
+        if (!shouldWindowFocusWait) {
+            super.onWindowFocusChanged(hasWindowFocus);
+        }
+    }
 }

@@ -19,12 +19,7 @@ public class DecryptTextClickListener implements View.OnClickListener {
     @Override
     public final void onClick(final View view) {
         try {
-            // do not run the click listener if a link was clicked
-            if (targetView.getSelectionStart() != -1 || targetView.getSelectionEnd() != -1) {
-                return;
-            }
-
-            CharSequence text = targetView.getText();
+            final CharSequence text = targetView.getText();
             if (text instanceof Spannable) {
                 targetView.setText(CryptUtils.rot13((Spannable) text));
             } else {

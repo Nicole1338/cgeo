@@ -1,14 +1,16 @@
 package cgeo.geocaching.utils;
 
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.R;
-import cgeo.geocaching.Waypoint;
-import cgeo.geocaching.enumerations.CacheListType;
 import cgeo.geocaching.enumerations.CacheSize;
 import cgeo.geocaching.enumerations.WaypointType;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.PocketQuery;
+import cgeo.geocaching.models.Waypoint;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import android.content.Context;
 import android.text.format.DateUtils;
@@ -17,13 +19,18 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
-public abstract class Formatter {
+public final class Formatter {
 
     /** Text separator used for formatting texts */
     public static final String SEPARATOR = " · ";
 
     private static final Context context = CgeoApplication.getInstance().getBaseContext();
+
+    private Formatter() {
+        // Utility class
+    }
 
     /**
      * Generate a time string according to system-wide settings (locale, 12/24 hour)
@@ -33,6 +40,7 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatTime(final long date) {
         return DateUtils.formatDateTime(context, date, DateUtils.FORMAT_SHOW_TIME);
     }
@@ -45,6 +53,7 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatDate(final long date) {
         return DateUtils.formatDateTime(context, date, DateUtils.FORMAT_SHOW_DATE);
     }
@@ -58,6 +67,7 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatFullDate(final long date) {
         return DateUtils.formatDateTime(context, date, DateUtils.FORMAT_SHOW_DATE
                 | DateUtils.FORMAT_SHOW_YEAR);
@@ -71,9 +81,14 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatShortDate(final long date) {
         final DateFormat dateFormat = android.text.format.DateFormat.getDateFormat(context);
         return dateFormat.format(date);
+    }
+
+    private static String formatShortDateIncludingWeekday(final long time) {
+        return DateUtils.formatDateTime(CgeoApplication.getInstance().getBaseContext(), time, DateUtils.FORMAT_SHOW_WEEKDAY | DateUtils.FORMAT_ABBREV_WEEKDAY) + ", " + formatShortDate(time);
     }
 
     /**
@@ -84,15 +99,24 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatShortDateVerbally(final long date) {
-        final int diff = cgeo.geocaching.utils.DateUtils.daysSince(date);
+        final String verbally = formatDateVerbally(date);
+        if (verbally != null) {
+            return verbally;
+        }
+        return formatShortDate(date);
+    }
+
+    private static String formatDateVerbally(final long date) {
+        final int diff = CalendarUtils.daysSince(date);
         switch (diff) {
             case 0:
                 return CgeoApplication.getInstance().getString(R.string.log_today);
             case 1:
                 return CgeoApplication.getInstance().getString(R.string.log_yesterday);
             default:
-                return formatShortDate(date);
+                return null;
         }
     }
 
@@ -104,6 +128,7 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatShortDateTime(final long date) {
         return DateUtils.formatDateTime(context, date, DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME | DateUtils.FORMAT_ABBREV_ALL);
     }
@@ -116,12 +141,14 @@ public abstract class Formatter {
      *            milliseconds since the epoch
      * @return the formatted string
      */
+    @NonNull
     public static String formatDateTime(final long date) {
         return DateUtils.formatDateTime(context, date, DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME);
     }
 
-    public static String formatCacheInfoLong(final Geocache cache, final CacheListType cacheListType) {
-        final ArrayList<String> infos = new ArrayList<>();
+    @NonNull
+    public static String formatCacheInfoLong(final Geocache cache) {
+        final List<String> infos = new ArrayList<>();
         if (StringUtils.isNotBlank(cache.getGeocode())) {
             infos.add(cache.getGeocode());
         }
@@ -131,24 +158,25 @@ public abstract class Formatter {
         if (cache.isPremiumMembersOnly()) {
             infos.add(CgeoApplication.getInstance().getString(R.string.cache_premium));
         }
-        if (cacheListType != CacheListType.OFFLINE && cacheListType != CacheListType.HISTORY && cache.getListId() > 0) {
+        if (cache.isOffline()) {
             infos.add(CgeoApplication.getInstance().getString(R.string.cache_offline));
         }
-        return StringUtils.join(infos, Formatter.SEPARATOR);
+        return StringUtils.join(infos, SEPARATOR);
     }
 
+    @NonNull
     public static String formatCacheInfoShort(final Geocache cache) {
-        final ArrayList<String> infos = new ArrayList<>();
+        final List<String> infos = new ArrayList<>();
         addShortInfos(cache, infos);
-        return StringUtils.join(infos, Formatter.SEPARATOR);
+        return StringUtils.join(infos, SEPARATOR);
     }
 
-    private static void addShortInfos(final Geocache cache, final ArrayList<String> infos) {
+    private static void addShortInfos(final Geocache cache, final List<String> infos) {
         if (cache.hasDifficulty()) {
-            infos.add("D " + String.format("%.1f", cache.getDifficulty()));
+            infos.add("D " + formatDT(cache.getDifficulty()));
         }
         if (cache.hasTerrain()) {
-            infos.add("T " + String.format("%.1f", cache.getTerrain()));
+            infos.add("T " + formatDT(cache.getTerrain()));
         }
 
         // don't show "not chosen" for events and virtuals, that should be the normal case
@@ -157,26 +185,32 @@ public abstract class Formatter {
         } else if (cache.isEventCache()) {
             final Date hiddenDate = cache.getHiddenDate();
             if (hiddenDate != null) {
-                infos.add(Formatter.formatShortDate(hiddenDate.getTime()));
+                infos.add(formatShortDateIncludingWeekday(hiddenDate.getTime()));
             }
         }
     }
 
-    public static String formatCacheInfoHistory(final Geocache cache) {
-        final ArrayList<String> infos = new ArrayList<>(3);
-        infos.add(StringUtils.upperCase(cache.getGeocode()));
-        infos.add(Formatter.formatDate(cache.getVisitedDate()));
-        infos.add(Formatter.formatTime(cache.getVisitedDate()));
-        return StringUtils.join(infos, Formatter.SEPARATOR);
+    private static String formatDT(final float value) {
+        return String.format(Locale.getDefault(), "%.1f", value);
     }
 
+    @NonNull
+    public static String formatCacheInfoHistory(final Geocache cache) {
+        final List<String> infos = new ArrayList<>(3);
+        infos.add(StringUtils.upperCase(cache.getGeocode()));
+        infos.add(formatDate(cache.getVisitedDate()));
+        infos.add(formatTime(cache.getVisitedDate()));
+        return StringUtils.join(infos, SEPARATOR);
+    }
+
+    @NonNull
     public static String formatWaypointInfo(final Waypoint waypoint) {
         final List<String> infos = new ArrayList<>(3);
         final WaypointType waypointType = waypoint.getWaypointType();
         if (waypointType != WaypointType.OWN && waypointType != null) {
             infos.add(waypointType.getL10n());
         }
-        if (Waypoint.PREFIX_OWN.equalsIgnoreCase(waypoint.getPrefix())) {
+        if (waypoint.isUserDefined()) {
             infos.add(CgeoApplication.getInstance().getString(R.string.waypoint_custom));
         } else {
             if (StringUtils.isNotBlank(waypoint.getPrefix())) {
@@ -186,11 +220,12 @@ public abstract class Formatter {
                 infos.add(waypoint.getLookup());
             }
         }
-        return StringUtils.join(infos, Formatter.SEPARATOR);
+        return StringUtils.join(infos, SEPARATOR);
     }
 
+    @NonNull
     public static String formatDaysAgo(final long date) {
-        final int days = cgeo.geocaching.utils.DateUtils.daysSince(date);
+        final int days = CalendarUtils.daysSince(date);
         switch (days) {
             case 0:
                 return CgeoApplication.getInstance().getString(R.string.log_today);
@@ -204,9 +239,9 @@ public abstract class Formatter {
     /**
      * Formatting of the hidden date of a cache
      *
-     * @param cache
      * @return {@code null} or hidden date of the cache (or event date of the cache) in human readable format
      */
+    @Nullable
     public static String formatHiddenDate(final Geocache cache) {
         final Date hiddenDate = cache.getHiddenDate();
         if (hiddenDate == null) {
@@ -216,11 +251,49 @@ public abstract class Formatter {
         if (time <= 0) {
             return null;
         }
-        String dateString = Formatter.formatFullDate(time);
+        String dateString = formatFullDate(time);
         if (cache.isEventCache()) {
+            // use today and yesterday strings
+            final String verbally = formatDateVerbally(time);
+            if (verbally != null) {
+                return verbally;
+            }
+            // otherwise use weekday and normal date
             dateString = DateUtils.formatDateTime(CgeoApplication.getInstance().getBaseContext(), time, DateUtils.FORMAT_SHOW_WEEKDAY) + ", " + dateString;
         }
+        // use just normal date
         return dateString;
     }
 
+    @NonNull
+    public static String formatMapSubtitle(final Geocache cache) {
+        return "D " + formatDT(cache.getDifficulty()) + SEPARATOR + "T " + formatDT(cache.getTerrain()) + SEPARATOR + cache.getGeocode();
+    }
+
+    @NonNull
+    public static String formatPocketQueryInfo(final PocketQuery pocketQuery) {
+        if (!pocketQuery.isDownloadable()) {
+            return StringUtils.EMPTY;
+        }
+
+        final List<String> infos = new ArrayList<>(3);
+        final int caches = pocketQuery.getCaches();
+        if (caches >= 0) {
+            infos.add(CgeoApplication.getInstance().getResources().getQuantityString(R.plurals.cache_counts, caches, caches));
+        }
+
+        final long lastGenerationTime = pocketQuery.getLastGenerationTime();
+        if (lastGenerationTime > 0) {
+            infos.add(Formatter.formatShortDateVerbally(lastGenerationTime));
+        }
+
+        final int daysRemaining = pocketQuery.getDaysRemaining();
+        if (daysRemaining == 0) {
+            infos.add(CgeoApplication.getInstance().getString(R.string.last_day_available));
+        } else {
+            infos.add(daysRemaining > 0 ? CgeoApplication.getInstance().getResources().getQuantityString(R.plurals.days_remaining, daysRemaining, daysRemaining) : StringUtils.EMPTY);
+        }
+
+        return StringUtils.join(infos, SEPARATOR);
+    }
 }

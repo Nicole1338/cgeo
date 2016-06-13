@@ -2,8 +2,6 @@ package cgeo.geocaching.activity;
 
 /**
  * Interface to implement by activities that want to utilize the NavigationActionProvider
- * 
- * @author rsudev
  *
  */
 public interface INavigationSource {

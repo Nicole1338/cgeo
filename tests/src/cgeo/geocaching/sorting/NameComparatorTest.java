@@ -1,15 +1,15 @@
 package cgeo.geocaching.sorting;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import cgeo.geocaching.Geocache;
-
-import android.test.AndroidTestCase;
+import junit.framework.TestCase;
 
 import java.util.ArrayList;
 import java.util.Collections;
 
-public class NameComparatorTest extends AndroidTestCase {
+import cgeo.geocaching.models.Geocache;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class NameComparatorTest extends TestCase {
 
     private static class NamedCache extends Geocache {
 
@@ -18,7 +18,7 @@ public class NameComparatorTest extends AndroidTestCase {
         }
     }
 
-    private NameComparator comp = new NameComparator();
+    private final NameComparator comp = new NameComparator();
 
     public void testLexical() {
         assertSorted(new NamedCache("A"), new NamedCache("Z"));
@@ -38,11 +38,10 @@ public class NameComparatorTest extends AndroidTestCase {
     /**
      * Assert that a given collection of names is already sorted correctly.
      *
-     * @param names
      */
-    private void assertSortedNames(String... names) {
-        ArrayList<Geocache> caches = new ArrayList<Geocache>(names.length);
-        for (String name : names) {
+    private void assertSortedNames(final String... names) {
+        final ArrayList<Geocache> caches = new ArrayList<>(names.length);
+        for (final String name : names) {
             caches.add(new NamedCache(name));
         }
         Collections.sort(caches, comp);
@@ -57,10 +56,10 @@ public class NameComparatorTest extends AndroidTestCase {
     }
 
     private void assertSorted(final Geocache cache1, final Geocache cache2) {
-        assertThat(comp.compare(cache1, cache2) < 0).isTrue();
+        assertThat(comp.compare(cache1, cache2)).isLessThan(0);
     }
 
     private void assertNotSorted(final Geocache cache1, final Geocache cache2) {
-        assertThat(comp.compare(cache1, cache2) > 0).isTrue();
+        assertThat(comp.compare(cache1, cache2)).isGreaterThan(0);
     }
 }

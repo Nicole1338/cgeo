@@ -1,22 +1,21 @@
 package cgeo.geocaching;
 
-import butterknife.InjectView;
-
-import cgeo.geocaching.ui.AbstractViewHolder;
-
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import butterknife.BindView;
+import cgeo.geocaching.ui.AbstractViewHolder;
+
 public class WaypointViewHolder extends AbstractViewHolder {
 
-    @InjectView(R.id.coordinates) protected TextView coordinatesView;
-    @InjectView(R.id.info) protected TextView infoView;
-    @InjectView(R.id.name) protected TextView nameView;
-    @InjectView(R.id.note) protected TextView noteView;
-    @InjectView(R.id.wpDefaultNavigation) protected ImageView wpNavView;
+    @BindView(R.id.coordinates) protected TextView coordinatesView;
+    @BindView(R.id.info) protected TextView infoView;
+    @BindView(R.id.name) protected TextView nameView;
+    @BindView(R.id.note) protected TextView noteView;
+    @BindView(R.id.wpDefaultNavigation) protected ImageView wpNavView;
 
-    public WaypointViewHolder(View rowView) {
+    public WaypointViewHolder(final View rowView) {
         super(rowView);
     }
 

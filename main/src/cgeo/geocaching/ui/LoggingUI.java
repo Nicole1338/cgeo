@@ -1,17 +1,19 @@
 package cgeo.geocaching.ui;
 
-import cgeo.geocaching.DataStore;
-import cgeo.geocaching.Geocache;
-import cgeo.geocaching.LogEntry;
 import cgeo.geocaching.R;
 import cgeo.geocaching.enumerations.LogType;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.LogEntry;
 import cgeo.geocaching.settings.Settings;
+import cgeo.geocaching.storage.DataStore;
+import cgeo.geocaching.ui.CacheListAdapter.ViewHolder;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.ArrayAdapter;
 
 import java.util.ArrayList;
@@ -22,6 +24,8 @@ public final class LoggingUI extends AbstractUIFactory {
     private LoggingUI() {
         // utility class
     }
+
+    private static View selectedView;
 
     public static class LogTypeEntry {
         private final LogType logType;
@@ -60,7 +64,7 @@ public final class LoggingUI extends AbstractUIFactory {
             this.stringId = stringId;
         }
 
-        public final String getL10n() {
+        public String getL10n() {
             return res.getString(stringId);
         }
     }
@@ -80,12 +84,12 @@ public final class LoggingUI extends AbstractUIFactory {
 
     private static void showOfflineMenu(final Geocache cache, final Activity activity) {
         final LogEntry currentLog = DataStore.loadLogOffline(cache.getGeocode());
-        final LogType currentLogType = currentLog == null ? null : currentLog.type;
+        final LogType currentLogType = currentLog == null ? null : currentLog.getType();
 
         final List<LogType> logTypes = cache.getPossibleLogTypes();
         final ArrayList<LogTypeEntry> list = new ArrayList<>();
         for (final LogType logType : logTypes) {
-            list.add(new LogTypeEntry(logType, null, logType == currentLogType));
+            list.add(new LogTypeEntry(logType, null, logType.equals(currentLogType)));
         }
         if (cache.isLogOffline()) {
             list.add(new LogTypeEntry(null, SpecialLogType.CLEAR_LOG, false));
@@ -114,6 +118,12 @@ public final class LoggingUI extends AbstractUIFactory {
                 } else {
                     cache.logOffline(activity, logTypeEntry.logType);
                 }
+                if (selectedView != null) {
+                    final ViewHolder holder = (ViewHolder) selectedView.getTag();
+                    if (holder != null) {
+                        CacheListAdapter.updateViewHolder(holder, cache, res);
+                    }
+                }
             }
         });
 
@@ -130,6 +140,11 @@ public final class LoggingUI extends AbstractUIFactory {
 
         final MenuItem itemOffline = menu.findItem(R.id.menu_log_visit_offline);
         itemOffline.setVisible(cache.supportsLogging() && Settings.getLogOffline());
+    }
+
+    public static void onPrepareOptionsMenu(final Menu menu, final Geocache cache, final View view) {
+        onPrepareOptionsMenu(menu, cache);
+        selectedView = view;
     }
 
     public static void addMenuItems(final Activity activity, final Menu menu, final Geocache cache) {

@@ -1,11 +1,11 @@
 package cgeo.geocaching.activity;
 
-import butterknife.ButterKnife;
-
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.R;
+import cgeo.geocaching.compatibility.Compatibility;
 import cgeo.geocaching.enumerations.CacheType;
+import cgeo.geocaching.network.AndroidBeam;
 import cgeo.geocaching.network.Cookies;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.utils.ClipboardUtils;
@@ -17,27 +17,22 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
-import rx.Subscription;
-import rx.subscriptions.Subscriptions;
-
-import android.annotation.TargetApi;
 import android.content.Intent;
 import android.content.res.Resources;
-import android.nfc.NdefMessage;
-import android.nfc.NdefRecord;
-import android.nfc.NfcAdapter;
-import android.nfc.NfcEvent;
-import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.LayoutRes;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
 import android.view.Window;
 import android.widget.EditText;
 
 import java.util.Locale;
+
+import butterknife.ButterKnife;
+import rx.Subscription;
+import rx.subscriptions.Subscriptions;
 
 public abstract class AbstractActivity extends ActionBarActivity implements IAbstractActivity {
 
@@ -54,11 +49,11 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
         this.keepScreenOn = keepScreenOn;
     }
 
-    final protected void showProgress(final boolean show) {
+    protected final void showProgress(final boolean show) {
         ActivityMixin.showProgress(this, show);
     }
 
-    final protected void setTheme() {
+    protected final void setTheme() {
         ActivityMixin.setTheme(this);
     }
 
@@ -70,14 +65,6 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
     @Override
     public final void showShortToast(final String text) {
         ActivityMixin.showShortToast(this, text);
-    }
-
-    @Override
-    public void onCreate(final Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        supportRequestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
-
-        initializeCommonFields();
     }
 
     @Override
@@ -128,10 +115,15 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
         ActivityMixin.invalidateOptionsMenu(this);
     }
 
-    protected void onCreate(final Bundle savedInstanceState, final int resourceLayoutID) {
+    @Override
+    public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        onCreateCommon();
+    }
 
-        initializeCommonFields();
+    protected void onCreate(final Bundle savedInstanceState, @LayoutRes final int resourceLayoutID) {
+        super.onCreate(savedInstanceState);
+        onCreateCommon();
 
         // non declarative part of layout
         setTheme();
@@ -139,10 +131,20 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
         setContentView(resourceLayoutID);
 
         // create view variables
-        ButterKnife.inject(this);
+        ButterKnife.bind(this);
+    }
+
+    /**
+     * Common actions for all onCreate functions.
+     */
+    private void onCreateCommon() {
+        supportRequestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
+        AndroidBeam.disable(this);
+        initializeCommonFields();
     }
 
     private void initializeCommonFields() {
+
         // initialize commonly used members
         res = this.getResources();
         app = (CgeoApplication) this.getApplication();
@@ -153,7 +155,7 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
     }
 
     @Override
-    public void setContentView(final int layoutResID) {
+    public void setContentView(@LayoutRes final int layoutResID) {
         super.setContentView(layoutResID);
 
         // initialize the action bar title with the activity title for single source
@@ -162,10 +164,6 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
 
     protected void hideKeyboard() {
         new Keyboard(this).hide();
-    }
-
-    public void showKeyboard(final View view) {
-        new Keyboard(this).show(view);
     }
 
     protected void buildDetailsContextMenu(final ActionMode actionMode, final Menu menu, final CharSequence fieldTitle, final boolean copyOnly) {
@@ -179,6 +177,9 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
     }
 
     protected boolean onClipboardItemSelected(@NonNull final ActionMode actionMode, final MenuItem item, final CharSequence clickedItemText) {
+        if (clickedItemText == null) {
+            return false;
+        }
         switch (item.getItemId()) {
             // detail fields
             case R.id.menu_copy:
@@ -206,45 +207,6 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
         }
     }
 
-    // Do not support older devices than Android 4.0
-    // Although there even are 2.3 devices  (Nexus S)
-    // these are so few that we don't want to deal with the older (non Android Beam) API
-
-    public interface ActivitySharingInterface {
-        /** Return an URL that represent the current activity for sharing or null for no sharing. */
-        @Nullable
-        public String getAndroidBeamUri();
-    }
-
-    protected void initializeAndroidBeam(final ActivitySharingInterface sharingInterface) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-            initializeICSAndroidBeam(sharingInterface);
-        }
-    }
-
-    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    protected void initializeICSAndroidBeam(final ActivitySharingInterface sharingInterface) {
-        final NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(this);
-        if (nfcAdapter == null) {
-            return;
-        }
-        nfcAdapter.setNdefPushMessageCallback(new NfcAdapter.CreateNdefMessageCallback() {
-            @Override
-            public NdefMessage createNdefMessage(final NfcEvent event) {
-                final String uri = sharingInterface.getAndroidBeamUri();
-                if (uri == null) {
-                    return null;
-                }
-                final NdefRecord[] records = {
-                        NdefRecord.createUri(uri),
-                        NdefRecord.createApplicationRecord(CgeoApplication.getInstance().getPackageName())
-                };
-                return new NdefMessage(records);
-            }
-        }, this);
-
-    }
-
     protected void setCacheTitleBar(@Nullable final String geocode, @Nullable final String name, @Nullable final CacheType type) {
         if (StringUtils.isNotBlank(name)) {
             setTitle(StringUtils.isNotBlank(geocode) ? name + " (" + geocode + ")" : name);
@@ -252,13 +214,13 @@ public abstract class AbstractActivity extends ActionBarActivity implements IAbs
             setTitle(StringUtils.isNotBlank(geocode) ? geocode : res.getString(R.string.cache));
         }
         if (type != null) {
-            getSupportActionBar().setIcon(getResources().getDrawable(type.markerId));
+            getSupportActionBar().setIcon(Compatibility.getDrawable(getResources(), type.markerId));
         } else {
             getSupportActionBar().setIcon(android.R.color.transparent);
         }
     }
 
-    protected void setCacheTitleBar(final @NonNull Geocache cache) {
+    protected void setCacheTitleBar(@NonNull final Geocache cache) {
         setCacheTitleBar(cache.getGeocode(), cache.getName(), cache.getType());
     }
 

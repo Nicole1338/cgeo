@@ -1,35 +1,37 @@
 package cgeo.geocaching.connector.gc;
 
-import cgeo.geocaching.DataStore;
-import cgeo.geocaching.Geocache;
-import cgeo.geocaching.LogCacheActivity;
-import cgeo.geocaching.R;
-import cgeo.geocaching.TrackableLog;
-import cgeo.geocaching.activity.ActivityMixin;
-import cgeo.geocaching.connector.AbstractLoggingManager;
-import cgeo.geocaching.connector.ImageResult;
-import cgeo.geocaching.connector.LogResult;
-import cgeo.geocaching.enumerations.LogType;
-import cgeo.geocaching.enumerations.StatusCode;
-import cgeo.geocaching.loaders.UrlLoader;
-import cgeo.geocaching.network.Parameters;
-import cgeo.geocaching.settings.Settings;
-import cgeo.geocaching.utils.Log;
-import cgeo.geocaching.utils.TextUtils;
+import android.os.Bundle;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.Loader;
+import android.widget.CheckBox;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
-import android.net.Uri;
-import android.os.Bundle;
-import android.support.v4.app.LoaderManager;
-import android.support.v4.content.Loader;
-
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
+
+import cgeo.geocaching.LogCacheActivity;
+import cgeo.geocaching.R;
+import cgeo.geocaching.activity.ActivityMixin;
+import cgeo.geocaching.connector.AbstractLoggingManager;
+import cgeo.geocaching.connector.ImageResult;
+import cgeo.geocaching.connector.LogResult;
+import cgeo.geocaching.enumerations.Loaders;
+import cgeo.geocaching.enumerations.LogType;
+import cgeo.geocaching.enumerations.StatusCode;
+import cgeo.geocaching.loaders.UrlLoader;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.Image;
+import cgeo.geocaching.models.TrackableLog;
+import cgeo.geocaching.network.Parameters;
+import cgeo.geocaching.settings.Settings;
+import cgeo.geocaching.storage.DataStore;
+import cgeo.geocaching.utils.Log;
+import cgeo.geocaching.utils.TextUtils;
 
 class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.LoaderCallbacks<String> {
 
@@ -40,6 +42,7 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
     @NonNull private List<TrackableLog> trackables = Collections.emptyList();
     private List<LogType> possibleLogTypes;
     private boolean hasLoaderError = true;
+    private int premFavcount;
 
     GCLoggingManager(final LogCacheActivity activity, final Geocache cache) {
         this.activity = activity;
@@ -49,11 +52,12 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
     @Nullable
     @Override
     public Loader<String> onCreateLoader(final int arg0, final Bundle arg1) {
-        if (!Settings.isLogin()) { // allow offline logging
+        if (!Settings.hasGCCredentials()) { // allow offline logging
             ActivityMixin.showToast(activity, activity.getResources().getString(R.string.err_login));
             return null;
         }
-        return new UrlLoader(activity.getBaseContext(), "http://www.geocaching.com/seek/log.aspx", new Parameters("ID", cache.getCacheId()));
+        activity.onLoadStarted();
+        return new UrlLoader(activity.getBaseContext(), "https://www.geocaching.com/seek/log.aspx", new Parameters("ID", cache.getCacheId()));
     }
 
     @Override
@@ -75,7 +79,7 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
                     Log.w("Could not acquire GUID from log page for " + cache.getGeocode());
                 }
             }
-
+            premFavcount = GCParser.getFavoritePoints(page);
             hasLoaderError = possibleLogTypes.isEmpty();
         }
 
@@ -89,7 +93,7 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
 
     @Override
     public void init() {
-        activity.getSupportLoaderManager().initLoader(0, null, this);
+        activity.getSupportLoaderManager().initLoader(Loaders.LOGGING_GEOCHACHING.getLoaderId(), null, this);
     }
 
     @Override
@@ -97,15 +101,20 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
     public LogResult postLog(@NonNull final LogType logType, @NonNull final Calendar date, @NonNull final String log, @Nullable final String logPassword, @NonNull final List<TrackableLog> trackableLogs) {
 
         try {
+            final CheckBox favCheck = (CheckBox) activity.findViewById(R.id.favorite_check);
             final ImmutablePair<StatusCode, String> postResult = GCParser.postLog(cache.getGeocode(), cache.getCacheId(), viewstates, logType,
-                    date.get(Calendar.YEAR), (date.get(Calendar.MONTH) + 1), date.get(Calendar.DATE),
-                    log, trackableLogs);
+                    date.get(Calendar.YEAR), date.get(Calendar.MONTH) + 1, date.get(Calendar.DATE),
+                    log, trackableLogs, favCheck.isChecked());
 
             if (postResult.left == StatusCode.NO_ERROR) {
                 if (logType == LogType.TEMP_DISABLE_LISTING) {
                     cache.setDisabled(true);
                 } else if (logType == LogType.ENABLE_LISTING) {
                     cache.setDisabled(false);
+                }
+                if (favCheck.isChecked()) {
+                    cache.setFavorite(true);
+                    cache.setFavoritePoints(cache.getFavoritePoints() + 1);
                 }
             }
             return new LogResult(postResult.left, postResult.right);
@@ -118,11 +127,11 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
 
     @Override
     @NonNull
-    public ImageResult postLogImage(final String logId, final String imageCaption, final String imageDescription, final Uri imageUri) {
+    public ImageResult postLogImage(final String logId, final Image image) {
 
-        if (StringUtils.isNotBlank(imageUri.getPath())) {
+        if (!image.isEmpty()) {
 
-            final ImmutablePair<StatusCode, String> imageResult = GCParser.uploadLogImage(logId, imageCaption, imageDescription, imageUri);
+            final ImmutablePair<StatusCode, String> imageResult = GCParser.uploadLogImage(logId, image);
 
             return new ImageResult(imageResult.left, imageResult.right);
         }
@@ -151,6 +160,11 @@ class GCLoggingManager extends AbstractLoggingManager implements LoaderManager.L
             return Collections.emptyList();
         }
         return possibleLogTypes;
+    }
+
+    @Override
+    public int getPremFavoritePoints() {
+        return hasLoaderError ? 0 : premFavcount;
     }
 
 }

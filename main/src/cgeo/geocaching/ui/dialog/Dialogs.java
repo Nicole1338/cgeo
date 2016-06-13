@@ -8,19 +8,18 @@ import cgeo.geocaching.utils.ImageUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.Nullable;
 
-import rx.Observable;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.functions.Action1;
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.graphics.drawable.Drawable;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
+import android.support.annotation.DrawableRes;
+import android.support.annotation.StringRes;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -34,6 +33,11 @@ import android.widget.ListAdapter;
 import android.widget.TextView;
 
 import java.util.List;
+
+import butterknife.ButterKnife;
+import rx.Observable;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
 
 /**
  * Wrapper for {@link AlertDialog}. If you want to show a simple text, use one of the
@@ -213,7 +217,51 @@ public final class Dialogs {
         return confirm(context, getString(title), getString(msg), okayListener);
     }
 
-    private static String getString(final int resourceId) {
+    /**
+     * Confirm using three configurable buttons "Positive", "Negative" and "Neutral". Buttons text are configurable.
+     *
+     * @param context
+     *            activity hosting the dialog
+     * @param title
+     *            dialog title
+     * @param msg
+     *            dialog message
+     * @param positiveTextButton
+     *            Text for the positive button
+     * @param negativeTextButton
+     *            Text for the negative button
+     * @param neutralTextButton
+     *            Text for the neutral button
+     * @param positiveListener
+     *            listener of the positive button
+     * @param negativeListener
+     *            listener of the negative button
+     * @param neutralListener
+     *            listener of the neutral button
+     */
+    public static AlertDialog.Builder confirmPositiveNegativeNeutral(final Activity context,
+                                                                     final int title,
+                                                                     final String msg,
+                                                                     final int positiveTextButton,
+                                                                     final int negativeTextButton,
+                                                                     final int neutralTextButton,
+                                                                     final OnClickListener positiveListener,
+                                                                     final OnClickListener negativeListener,
+                                                                     final OnClickListener neutralListener) {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        final AlertDialog dialog = builder.setTitle(title)
+                .setCancelable(true)
+                .setMessage(msg)
+                .setPositiveButton(positiveTextButton, positiveListener)
+                .setNegativeButton(negativeTextButton, negativeListener)
+                .setNeutralButton(neutralTextButton, neutralListener)
+                .create();
+        dialog.setOwnerActivity(context);
+        dialog.show();
+        return builder;
+    }
+
+    private static String getString(@StringRes final int resourceId) {
         return CgeoApplication.getInstance().getString(resourceId);
     }
 
@@ -251,7 +299,7 @@ public final class Dialogs {
      * @param message
      *            message dialog content
      */
-    public static void message(final Activity context, final @Nullable String title, final String message) {
+    public static void message(final Activity context, @Nullable final String title, final String message) {
         message(context, title, message, null);
     }
 
@@ -267,7 +315,7 @@ public final class Dialogs {
      * @param iconObservable
      *            observable (may be <tt>null</tt>) containing the icon(s) to set
      */
-    public static void message(final Activity context, final @Nullable String title, final String message, final @Nullable Observable<Drawable> iconObservable) {
+    public static void message(final Activity context, @Nullable final String title, final String message, @Nullable final Observable<Drawable> iconObservable) {
         final Builder builder = new AlertDialog.Builder(context)
                 .setMessage(message)
                 .setCancelable(true)
@@ -408,7 +456,6 @@ public final class Dialogs {
     /**
      * Move the cursor to the end of the input field.
      *
-     * @param input
      */
     public static void moveCursorToEnd(final EditText input) {
         input.setSelection(input.getText().length(), input.getText().length());
@@ -418,10 +465,11 @@ public final class Dialogs {
         dialog.getButton(DialogInterface.BUTTON_POSITIVE).setEnabled(StringUtils.isNotBlank(input));
     }
 
-    public static interface ItemWithIcon {
+    public interface ItemWithIcon {
         /**
-         * @return the drawable
+         * @return the drawable resource, or {@code 0} for no drawable
          */
+        @DrawableRes
         int getIcon();
     }
 
@@ -437,7 +485,7 @@ public final class Dialogs {
                 final View v = super.getView(position, convertView, parent);
 
                 // add image
-                final TextView tv = (TextView) v.findViewById(android.R.id.text1);
+                final TextView tv = ButterKnife.findById(v, android.R.id.text1);
                 tv.setCompoundDrawablesWithIntrinsicBounds(items.get(position).getIcon(), 0, 0, 0);
 
                 // Add margin between image and text
@@ -456,5 +504,14 @@ public final class Dialogs {
                         listener.call(items.get(item));
                     }
                 }).show();
+    }
+
+    public static void dismiss(@Nullable final ProgressDialog dialog) {
+        if (dialog == null) {
+            return;
+        }
+        if (dialog.isShowing()) {
+            dialog.dismiss();
+        }
     }
 }

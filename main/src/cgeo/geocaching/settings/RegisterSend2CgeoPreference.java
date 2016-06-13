@@ -5,13 +5,11 @@ import cgeo.geocaching.activity.ActivityMixin;
 import cgeo.geocaching.network.Network;
 import cgeo.geocaching.network.Parameters;
 import cgeo.geocaching.ui.dialog.Dialogs;
+import cgeo.geocaching.utils.AndroidRxUtils;
 import cgeo.geocaching.utils.Log;
-import cgeo.geocaching.utils.RxUtils;
 
-import ch.boye.httpclientandroidlib.HttpResponse;
-
+import okhttp3.Response;
 import org.apache.commons.lang3.StringUtils;
-
 import rx.Observable;
 import rx.android.app.AppObservable;
 import rx.functions.Action1;
@@ -24,11 +22,11 @@ import android.util.AttributeSet;
 
 public class RegisterSend2CgeoPreference extends AbstractClickablePreference {
 
-    public RegisterSend2CgeoPreference(Context context, AttributeSet attrs) {
+    public RegisterSend2CgeoPreference(final Context context, final AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public RegisterSend2CgeoPreference(Context context, AttributeSet attrs, int defStyle) {
+    public RegisterSend2CgeoPreference(final Context context, final AttributeSet attrs, final int defStyle) {
         super(context, attrs, defStyle);
     }
 
@@ -36,7 +34,7 @@ public class RegisterSend2CgeoPreference extends AbstractClickablePreference {
     protected OnPreferenceClickListener getOnPreferenceClickListener(final SettingsActivity activity) {
         return new OnPreferenceClickListener() {
             @Override
-            public boolean onPreferenceClick(Preference preference) {
+            public boolean onPreferenceClick(final Preference preference) {
                 // satisfy static code analysis
                 if (activity == null) {
                     return true;
@@ -62,31 +60,29 @@ public class RegisterSend2CgeoPreference extends AbstractClickablePreference {
                         final String cod = StringUtils.defaultString(deviceCode);
 
                         final Parameters params = new Parameters("name", nam, "code", cod);
-                        HttpResponse response = Network.getRequest("http://send2.cgeo.org/auth.html", params);
 
-                        if (response != null && response.getStatusLine().getStatusCode() == 200) {
-                            //response was OK
+                        try {
+                            final Response response = Network.getRequest("http://send2.cgeo.org/auth.html", params)
+                                    .flatMap(Network.withSuccess).toBlocking().value();
+
                             final String[] strings = StringUtils.split(Network.getResponseData(response), ',');
                             if (strings != null) {
                                 Settings.setWebNameCode(nam, strings[0]);
-                                try {
-                                    return Observable.just(Integer.parseInt(strings[1].trim()));
-                                } catch (final Exception e) {
-                                    Log.e("RegisterSend2CgeoPreference", e);
-                                }
+                                return Observable.just(Integer.valueOf(strings[1].trim()));
                             }
+                        } catch (final Exception e) {
+                            Log.e("RegisterSend2CgeoPreference", e);
                         }
 
                         return Observable.empty();
                     }
-                }).firstOrDefault(0)).subscribeOn(RxUtils.networkScheduler).subscribe(new Action1<Integer>() {
+                }).firstOrDefault(0)).subscribeOn(AndroidRxUtils.networkScheduler).subscribe(new Action1<Integer>() {
                     @Override
                     public void call(final Integer pin) {
                         progressDialog.dismiss();
                         if (pin > 0) {
                             Dialogs.message(activity, R.string.init_sendToCgeo,
-                                    activity.getString(R.string.init_sendToCgeo_register_ok)
-                                            .replace("####", String.valueOf(pin)));
+                                    activity.getString(R.string.init_sendToCgeo_register_ok, pin));
                         } else {
                             Dialogs.message(activity, R.string.init_sendToCgeo, R.string.init_sendToCgeo_register_fail);
                         }

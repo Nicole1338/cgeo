@@ -1,18 +1,18 @@
 package cgeo.geocaching.maps.mapsforge;
 
-import cgeo.geocaching.IWaypoint;
+import cgeo.geocaching.models.IWaypoint;
 import cgeo.geocaching.maps.interfaces.CachesOverlayItemImpl;
 
-import org.mapsforge.android.maps.overlay.OverlayItem;
-import org.mapsforge.core.GeoPoint;
+import org.mapsforge.v3.android.maps.overlay.OverlayItem;
+import org.mapsforge.v3.core.GeoPoint;
 
 import android.graphics.drawable.Drawable;
 
 public class MapsforgeCacheOverlayItem extends OverlayItem implements CachesOverlayItemImpl {
-    final private IWaypoint coord;
-    final private boolean applyDistanceRule;
+    private final IWaypoint coord;
+    private final boolean applyDistanceRule;
 
-    public MapsforgeCacheOverlayItem(IWaypoint coordinate, boolean applyDistanceRule) {
+    public MapsforgeCacheOverlayItem(final IWaypoint coordinate, final boolean applyDistanceRule) {
         super(new GeoPoint(coordinate.getCoords().getLatitudeE6(), coordinate.getCoords().getLongitudeE6()), coordinate.getName(), "");
 
         this.coord = coordinate;
@@ -25,7 +25,7 @@ public class MapsforgeCacheOverlayItem extends OverlayItem implements CachesOver
     }
 
     @Override
-    public Drawable getMarker(int index) {
+    public Drawable getMarker(final int index) {
         return getMarker();
     }
 

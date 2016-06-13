@@ -3,21 +3,21 @@ package cgeo.geocaching.maps.mapsforge;
 import cgeo.geocaching.maps.interfaces.GeoPointImpl;
 import cgeo.geocaching.maps.interfaces.MapProjectionImpl;
 
-import org.mapsforge.android.maps.Projection;
-import org.mapsforge.core.GeoPoint;
+import org.mapsforge.v3.android.maps.Projection;
+import org.mapsforge.v3.core.GeoPoint;
 
 import android.graphics.Point;
 
 public class MapsforgeMapProjection implements MapProjectionImpl {
 
-    private Projection projection;
+    private final Projection projection;
 
-    public MapsforgeMapProjection(Projection projectionIn) {
+    public MapsforgeMapProjection(final Projection projectionIn) {
         projection = projectionIn;
     }
 
     @Override
-    public void toPixels(GeoPointImpl leftGeo, Point left) {
+    public void toPixels(final GeoPointImpl leftGeo, final Point left) {
         projection.toPixels((GeoPoint) leftGeo, left);
     }
 

@@ -1,13 +1,13 @@
 package cgeo.geocaching.ui;
 
-import butterknife.ButterKnife;
-
-import cgeo.geocaching.Geocache;
-import cgeo.geocaching.ICoordinates;
 import cgeo.geocaching.R;
-import cgeo.geocaching.Waypoint;
 import cgeo.geocaching.connector.ConnectorFactory;
+import cgeo.geocaching.enumerations.LogType;
 import cgeo.geocaching.location.Units;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.ICoordinates;
+import cgeo.geocaching.models.LogEntry;
+import cgeo.geocaching.models.Waypoint;
 import cgeo.geocaching.sensors.Sensors;
 import cgeo.geocaching.utils.Formatter;
 
@@ -26,6 +26,9 @@ import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+
+import butterknife.ButterKnife;
 
 // TODO The suppression of this lint finding is bad. But to fix it, someone needs to rework the layout of the cache
 // details also, not just only change the code here.
@@ -74,9 +77,10 @@ public final class CacheDetailsCreator {
         lastValueView = ButterKnife.findById(layout, R.id.value);
 
         nameView.setText(activity.getResources().getString(nameId));
-        lastValueView.setText(String.format("%.1f", value) + ' ' + activity.getResources().getString(R.string.cache_rating_of) + " " + String.format("%d", max));
+        lastValueView.setText(String.format(Locale.getDefault(), "%.1f", value) + ' ' + activity.getResources().getString(R.string.cache_rating_of) + ' ' + String.format(Locale.getDefault(), "%d", max));
 
         final RatingBar layoutStars = ButterKnife.findById(layout, R.id.stars);
+        layoutStars.setNumStars(max);
         layoutStars.setRating(value);
         layoutStars.setVisibility(View.VISIBLE);
 
@@ -85,26 +89,33 @@ public final class CacheDetailsCreator {
     }
 
     public void addCacheState(final Geocache cache) {
-        if (cache.isLogOffline() || cache.isArchived() || cache.isDisabled() || cache.isPremiumMembersOnly() || cache.isFound()) {
-            final List<String> states = new ArrayList<>(5);
-            String date = getVisitedDate(cache);
-            if (cache.isLogOffline()) {
-                states.add(res.getString(R.string.cache_status_offline_log) + date);
-                // reset the found date, to avoid showing it twice
-                date = "";
+        final List<String> states = new ArrayList<>(5);
+        String date = getVisitedDate(cache);
+        if (cache.isLogOffline()) {
+            states.add(res.getString(R.string.cache_status_offline_log) + date);
+            // reset the found date, to avoid showing it twice
+            date = "";
+        }
+        if (cache.isFound()) {
+            states.add(res.getString(R.string.cache_status_found) + date);
+        }
+        if (cache.isEventCache() && states.isEmpty()) {
+            for (final LogEntry log : cache.getLogs()) {
+                if (LogType.WILL_ATTEND.equals(log.getType()) && log.isOwn()) {
+                    states.add(LogType.WILL_ATTEND.getL10n());
+                }
             }
-            if (cache.isFound()) {
-                states.add(res.getString(R.string.cache_status_found) + date);
-            }
-            if (cache.isArchived()) {
-                states.add(res.getString(R.string.cache_status_archived));
-            }
-            if (cache.isDisabled()) {
-                states.add(res.getString(R.string.cache_status_disabled));
-            }
-            if (cache.isPremiumMembersOnly()) {
-                states.add(res.getString(R.string.cache_status_premium));
-            }
+        }
+        if (cache.isArchived()) {
+            states.add(res.getString(R.string.cache_status_archived));
+        }
+        if (cache.isDisabled()) {
+            states.add(res.getString(R.string.cache_status_disabled));
+        }
+        if (cache.isPremiumMembersOnly()) {
+            states.add(res.getString(R.string.cache_status_premium));
+        }
+        if (!states.isEmpty()) {
             add(R.string.cache_status, StringUtils.join(states, ", "));
         }
     }
@@ -152,16 +163,13 @@ public final class CacheDetailsCreator {
 
     public void addDistance(final Geocache cache, final TextView cacheDistanceView) {
         Float distance = distanceNonBlocking(cache);
-        if (distance == null) {
-            if (cache.getDistance() != null) {
-                distance = cache.getDistance();
-            }
+        if (distance == null && cache.getDistance() != null) {
+            distance = cache.getDistance();
         }
         String text = "--";
         if (distance != null) {
             text = Units.getDistanceFromKilometers(distance);
-        }
-        else if (cacheDistanceView != null) {
+        } else if (cacheDistanceView != null) {
             // if there is already a distance in cacheDistance, use it instead of resetting to default.
             // this prevents displaying "--" while waiting for a new position update (See bug #1468)
             text = cacheDistanceView.getText().toString();
@@ -174,8 +182,7 @@ public final class CacheDetailsCreator {
         String text = "--";
         if (distance != null) {
             text = Units.getDistanceFromKilometers(distance);
-        }
-        else if (waypointDistanceView != null) {
+        } else if (waypointDistanceView != null) {
             // if there is already a distance in waypointDistance, use it instead of resetting to default.
             // this prevents displaying "--" while waiting for a new position update (See bug #1468)
             text = waypointDistanceView.getText().toString();
@@ -190,7 +197,7 @@ public final class CacheDetailsCreator {
         addHiddenDate(cache);
     }
 
-    public TextView addHiddenDate(final @NonNull Geocache cache) {
+    public TextView addHiddenDate(@NonNull final Geocache cache) {
         final String dateString = Formatter.formatHiddenDate(cache);
         if (StringUtils.isEmpty(dateString)) {
             return null;

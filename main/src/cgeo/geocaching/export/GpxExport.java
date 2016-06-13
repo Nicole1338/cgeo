@@ -1,18 +1,19 @@
 package cgeo.geocaching.export;
 
-import butterknife.ButterKnife;
-
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.R;
 import cgeo.geocaching.activity.ActivityMixin;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.utils.AsyncTaskWithProgress;
+import cgeo.geocaching.utils.EnvironmentUtils;
 import cgeo.geocaching.utils.FileUtils;
 import cgeo.geocaching.utils.Log;
 import cgeo.geocaching.utils.ShareUtils;
 
 import org.apache.commons.lang3.CharEncoding;
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -21,7 +22,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
-import android.os.Environment;
 import android.view.ContextThemeWrapper;
 import android.view.View;
 import android.widget.CheckBox;
@@ -39,16 +39,21 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import butterknife.ButterKnife;
+
 public class GpxExport extends AbstractExport {
 
+    private String fileName = "geocache.gpx"; // used in tests
+
     public GpxExport() {
-        super(getString(R.string.export_gpx));
+        super(R.string.export_gpx);
     }
 
     @Override
-    public void export(final List<Geocache> caches, final Activity activity) {
+    public void export(@NonNull final List<Geocache> caches, @Nullable final Activity activity) {
         final String[] geocodes = getGeocodes(caches);
-        if (null == activity) {
+        calculateFileName(geocodes);
+        if (activity == null) {
             // No activity given, so no user interaction possible.
             // Start export with default parameters.
             new ExportTask(null).execute(geocodes);
@@ -59,36 +64,43 @@ public class GpxExport extends AbstractExport {
         }
     }
 
+    private void calculateFileName(final String[] geocodes) {
+        if (geocodes.length == 1) {
+            // geocode as file name
+            fileName = geocodes[0] + ".gpx";
+        } else {
+            // date and time as file name
+            final SimpleDateFormat fileNameDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            fileName = "export_" + fileNameDateFormat.format(new Date()) + ".gpx";
+        }
+        fileName = FileUtils.getUniqueNamedFile(new File(Settings.getGpxExportDir(), fileName)).getName();
+    }
+
     private Dialog getExportDialog(final String[] geocodes, final Activity activity) {
         final AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setTitle(activity.getString(R.string.export_confirm_title, activity.getString(R.string.export_gpx)));
 
         final Context themedContext;
-        if (Settings.isLightSkin() && VERSION.SDK_INT < VERSION_CODES.HONEYCOMB)
+        if (Settings.isLightSkin() && VERSION.SDK_INT < VERSION_CODES.HONEYCOMB) {
             themedContext = new ContextThemeWrapper(activity, R.style.dark);
-        else
+        } else {
             themedContext = activity;
+        }
 
         final View layout = View.inflate(themedContext, R.layout.gpx_export_dialog, null);
         builder.setView(layout);
 
         final TextView text = ButterKnife.findById(layout, R.id.info);
-        text.setText(getString(R.string.export_gpx_info, Settings.getGpxExportDir()));
+        text.setText(activity.getString(R.string.export_confirm_message, Settings.getGpxExportDir(), fileName));
 
         final CheckBox shareOption = ButterKnife.findById(layout, R.id.share);
-
         shareOption.setChecked(Settings.getShareAfterExport());
-
-        shareOption.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(final View v) {
-                Settings.setShareAfterExport(shareOption.isChecked());
-            }
-        });
 
         builder.setPositiveButton(R.string.export, new DialogInterface.OnClickListener() {
 
             @Override
             public void onClick(final DialogInterface dialog, final int which) {
+                Settings.setShareAfterExport(shareOption.isChecked());
                 dialog.dismiss();
                 new ExportTask(activity).execute(geocodes);
             }
@@ -102,7 +114,6 @@ public class GpxExport extends AbstractExport {
     }
 
     protected class ExportTask extends AsyncTaskWithProgress<String, File> {
-        private final Activity activity;
 
         /**
          * Instantiates and configures the task for exporting field notes.
@@ -112,19 +123,16 @@ public class GpxExport extends AbstractExport {
          */
         public ExportTask(final Activity activity) {
             super(activity, getProgressTitle());
-            this.activity = activity;
         }
 
         private File getExportFile() {
-            final SimpleDateFormat fileNameDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            final Date now = new Date();
-            return FileUtils.getUniqueNamedFile(Settings.getGpxExportDir() + File.separatorChar + "export_" + fileNameDateFormat.format(now) + ".gpx");
+            return FileUtils.getUniqueNamedFile(new File(Settings.getGpxExportDir(), fileName));
         }
 
         @Override
         protected File doInBackgroundInternal(final String[] geocodes) {
             // quick check for being able to write the GPX file
-            if (!Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+            if (!EnvironmentUtils.isExternalStorageAvailable()) {
                 return null;
             }
 
@@ -169,14 +177,15 @@ public class GpxExport extends AbstractExport {
 
         @Override
         protected void onPostExecuteInternal(final File exportFile) {
-            if (null != activity) {
+            final Activity activityLocal = activity;
+            if (activityLocal != null) {
                 if (exportFile != null) {
-                    ActivityMixin.showToast(activity, getName() + ' ' + getString(R.string.export_exportedto) + ": " + exportFile.toString());
+                    ActivityMixin.showToast(activityLocal, getName() + ' ' + activityLocal.getString(R.string.export_exportedto) + ": " + exportFile.toString());
                     if (Settings.getShareAfterExport()) {
-                        ShareUtils.share(activity, exportFile, "application/xml", R.string.export_gpx_to);
+                        ShareUtils.share(activityLocal, exportFile, "application/xml", R.string.export_gpx_to);
                     }
                 } else {
-                    ActivityMixin.showToast(activity, getString(R.string.export_failed));
+                    ActivityMixin.showToast(activityLocal, activityLocal.getString(R.string.export_failed));
                 }
             }
         }

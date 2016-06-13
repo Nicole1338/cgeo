@@ -1,17 +1,27 @@
 package cgeo.geocaching.filter;
 
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.R;
+import cgeo.geocaching.models.Geocache;
 
 import org.eclipse.jdt.annotation.NonNull;
+
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.support.annotation.StringRes;
 
 import java.util.ArrayList;
 import java.util.List;
 
 class DifficultyFilter extends AbstractRangeFilter {
 
-    public DifficultyFilter(final int difficulty) {
-        super(R.string.cache_difficulty, difficulty);
+    private DifficultyFilter(@StringRes final int name, final int difficulty) {
+        // do not inline the name constant. Android Lint has a bug which would lead to using the super super constructors
+        // @StringRes annotation for the non-annotated difficulty parameter of this constructor.
+        super(name, difficulty, Factory.DIFFICULTY_MAX);
+    }
+
+    protected DifficultyFilter(final Parcel in) {
+        super(in);
     }
 
     @Override
@@ -28,12 +38,25 @@ class DifficultyFilter extends AbstractRangeFilter {
         @Override
         @NonNull
         public List<IFilter> getFilters() {
-            final ArrayList<IFilter> filters = new ArrayList<>(DIFFICULTY_MAX);
+            final List<IFilter> filters = new ArrayList<>(DIFFICULTY_MAX);
             for (int difficulty = DIFFICULTY_MIN; difficulty <= DIFFICULTY_MAX; difficulty++) {
-                filters.add(new DifficultyFilter(difficulty));
+                filters.add(new DifficultyFilter(R.string.cache_difficulty, difficulty));
             }
             return filters;
         }
-
     }
+
+    public static final Creator<DifficultyFilter> CREATOR
+            = new Parcelable.Creator<DifficultyFilter>() {
+
+        @Override
+        public DifficultyFilter createFromParcel(final Parcel in) {
+            return new DifficultyFilter(in);
+        }
+
+        @Override
+        public DifficultyFilter[] newArray(final int size) {
+            return new DifficultyFilter[size];
+        }
+    };
 }

@@ -4,8 +4,12 @@ import cgeo.geocaching.Intents;
 import cgeo.geocaching.R;
 import cgeo.geocaching.activity.AbstractListActivity;
 import cgeo.geocaching.list.StoredList;
+import cgeo.geocaching.storage.LocalStorage;
+import cgeo.geocaching.ui.dialog.Dialogs;
+import cgeo.geocaching.utils.EnvironmentUtils;
 import cgeo.geocaching.utils.FileUtils;
 import cgeo.geocaching.utils.Log;
+import cgeo.geocaching.utils.TextUtils;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -35,7 +39,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
     protected int listId = StoredList.STANDARD_LIST_ID;
     private String[] extensions;
 
-    final private Handler changeWaitDialogHandler = new Handler() {
+    private final Handler changeWaitDialogHandler = new Handler() {
         private String searchInfo;
 
         @Override
@@ -52,7 +56,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
         }
 
         private String getDefaultFolders() {
-            final ArrayList<String> names = new ArrayList<>();
+            final List<String> names = new ArrayList<>();
             for (final File dir : getExistingBaseFolders()) {
                 names.add(dir.getPath());
             }
@@ -60,13 +64,11 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
         }
     };
 
-    final private Handler loadFilesHandler = new Handler() {
+    private final Handler loadFilesHandler = new Handler() {
 
         @Override
         public void handleMessage(final Message msg) {
-            if (waitDialog != null) {
-                waitDialog.dismiss();
-            }
+            Dialogs.dismiss(waitDialog);
             if (CollectionUtils.isEmpty(files) && requireFiles()) {
                 showToast(res.getString(R.string.file_list_no_files));
                 finish();
@@ -148,7 +150,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
         private final FileListSelector selector = new FileListSelector();
 
         public void notifyEnd() {
-            selector.setShouldEnd(true);
+            selector.setShouldEnd();
         }
 
         @Override
@@ -156,7 +158,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
             final List<File> list = new ArrayList<>();
 
             try {
-                if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                if (EnvironmentUtils.isExternalStorageAvailable()) {
                     boolean loaded = false;
                     for (final File dir : getExistingBaseFolders()) {
                         FileUtils.listDir(list, dir, selector, changeWaitDialogHandler);
@@ -183,7 +185,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
 
                 @Override
                 public int compare(final File lhs, final File rhs) {
-                    return lhs.getName().compareToIgnoreCase(rhs.getName());
+                    return TextUtils.COLLATOR.compare(lhs.getName(), rhs.getName());
                 }
             });
 
@@ -201,8 +203,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
      * Check if a filename belongs to the AbstractFileListActivity. This implementation checks for file extensions.
      * Subclasses may override this method to filter out specific files.
      *
-     * @param filename
-     * @return <code>true</code> if the filename belongs to the list
+     * @return {@code true} if the filename belongs to the list
      */
     protected boolean filenameBelongsToList(@NonNull final String filename) {
         for (final String ext : extensions) {
@@ -214,7 +215,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
     }
 
     protected List<File> getExistingBaseFolders() {
-        final ArrayList<File> result = new ArrayList<>();
+        final List<File> result = new ArrayList<>();
         for (final File dir : getBaseFolders()) {
             if (dir.exists() && dir.isDirectory()) {
                 result.add(dir);
@@ -241,7 +242,7 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
         }
     }
 
-    private class FileListSelector extends FileUtils.FileSelector {
+    private class FileListSelector implements FileUtils.FileSelector {
 
         boolean shouldEnd = false;
 
@@ -255,8 +256,14 @@ public abstract class AbstractFileListActivity<T extends ArrayAdapter<File>> ext
             return shouldEnd;
         }
 
-        public synchronized void setShouldEnd(final boolean shouldEnd) {
-            this.shouldEnd = shouldEnd;
+        public synchronized void setShouldEnd() {
+            this.shouldEnd = true;
         }
+    }
+
+    @Override
+    public void finish() {
+        Dialogs.dismiss(waitDialog);
+        super.finish();
     }
 }

@@ -10,9 +10,7 @@ import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.utils.Log;
 
 import org.apache.commons.lang3.StringUtils;
-
-import rx.Subscription;
-import rx.subscriptions.Subscriptions;
+import org.eclipse.jdt.annotation.NonNull;
 
 import android.app.Activity;
 import android.app.Service;
@@ -22,7 +20,8 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.TextToSpeech.Engine;
 import android.speech.tts.TextToSpeech.OnInitListener;
 
-import java.util.Locale;
+import rx.Subscription;
+import rx.subscriptions.Subscriptions;
 
 /**
  * Service to speak the compass directions.
@@ -46,8 +45,14 @@ public class SpeechService extends Service implements OnInitListener {
     protected Geopoint position;
 
     final GeoDirHandler geoDirHandler = new GeoDirHandler() {
+
         @Override
-        public void updateGeoDir(final GeoData newGeo, final float newDirection) {
+        public void updateGeoDir(@NonNull final GeoData newGeo, final float newDirection) {
+            // We might receive a location update before the target has been set. In this case, do nothing.
+            if (target == null) {
+                return;
+            }
+
             position = newGeo.getCoords();
             direction = newDirection;
             // avoid any calculation, if the delay since the last output is not long enough
@@ -58,10 +63,8 @@ public class SpeechService extends Service implements OnInitListener {
 
             // to speak, we want max pause to have elapsed or distance to geopoint to have changed by a given amount
             final float distance = position.distanceTo(target);
-            if (now - lastSpeechTime <= SPEECH_MAXPAUSE_SECONDS * 1000) {
-                if (Math.abs(lastSpeechDistance - distance) < getDeltaForDistance(distance)) {
-                    return;
-                }
+            if (now - lastSpeechTime <= SPEECH_MAXPAUSE_SECONDS * 1000 && Math.abs(lastSpeechDistance - distance) < getDeltaForDistance(distance)) {
+                return;
             }
 
             final String text = TextFactory.getText(position, target, direction);
@@ -126,19 +129,14 @@ public class SpeechService extends Service implements OnInitListener {
             return;
         }
 
-        Locale locale = Locale.getDefault();
-        if (Settings.isUseEnglish()) {
-            locale = Locale.ENGLISH;
-        }
-
-        final int switchLocale = tts.setLanguage(locale);
+        final int switchLocale = tts.setLanguage(Settings.getApplicationLocale());
 
         if (switchLocale == TextToSpeech.LANG_MISSING_DATA) {
             startingActivity.startActivity(new Intent(Engine.ACTION_INSTALL_TTS_DATA));
             return;
         }
         if (switchLocale == TextToSpeech.LANG_NOT_SUPPORTED) {
-            Log.e("Current languge not supported by text to speech.");
+            Log.e("Current language not supported by text to speech.");
             ActivityMixin.showToast(startingActivity, R.string.err_tts_lang_not_supported);
             return;
         }

@@ -3,7 +3,6 @@ package cgeo.geocaching.connector;
 import cgeo.contacts.ContactsAddon;
 import cgeo.geocaching.CacheListActivity;
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.LogCacheActivity;
 import cgeo.geocaching.R;
 import cgeo.geocaching.connector.UserAction.Context;
@@ -16,22 +15,38 @@ import cgeo.geocaching.connector.capability.ISearchByViewPort;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.enumerations.LogType;
 import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.models.Geocache;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
-import rx.functions.Action1;
+import android.support.annotation.StringRes;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import rx.functions.Action1;
 
 public abstract class AbstractConnector implements IConnector {
 
     @Override
     public boolean canHandle(@NonNull final String geocode) {
         return false;
+    }
+
+    @Override
+    public Set<String> handledGeocodes(@NonNull final Set<String> geocodes) {
+        final Set<String> strippedList = new HashSet<>();
+        for (final String geocode: geocodes) {
+            if (canHandle(geocode)) {
+                strippedList.add(geocode);
+            }
+        }
+        return strippedList;
     }
 
     @Override
@@ -93,6 +108,11 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
+    public boolean supportsAddToFavorite(final Geocache cache, final LogType type) {
+        return false;
+    }
+
+    @Override
     public boolean canLog(@NonNull final Geocache cache) {
         return false;
     }
@@ -105,7 +125,7 @@ public abstract class AbstractConnector implements IConnector {
 
     @Override
     @NonNull
-    public String getLicenseText(final @NonNull Geocache cache) {
+    public String getLicenseText(@NonNull final Geocache cache) {
         return StringUtils.EMPTY;
     }
 
@@ -130,7 +150,8 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public String getGeocodeFromUrl(final String url) {
+    @Nullable
+    public String getGeocodeFromUrl(@NonNull final String url) {
         final String urlPrefix = getCacheUrlPrefix();
         if (StringUtils.isEmpty(urlPrefix) || StringUtils.startsWith(url, urlPrefix)) {
             @NonNull final String geocode = url.substring(urlPrefix.length());
@@ -142,11 +163,23 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @NonNull
-    abstract protected String getCacheUrlPrefix();
+    protected abstract String getCacheUrlPrefix();
+
+    @Override
+    @NonNull
+    public String getHostUrl() {
+        return "http://" + getHost();
+    }
+
+    @Override
+    @NonNull
+    public String getTestUrl() {
+        return getHostUrl();
+    }
 
     @Override
     @Nullable
-    public String getLongCacheUrl(final @NonNull Geocache cache) {
+    public String getLongCacheUrl(@NonNull final Geocache cache) {
         return getCacheUrl(cache);
     }
 
@@ -173,7 +206,7 @@ public abstract class AbstractConnector implements IConnector {
             if (geocache.isOwner()) {
                 logTypes.add(LogType.ANNOUNCEMENT);
             }
-        } else if (CacheType.WEBCAM == geocache.getType()) {
+        } else if (geocache.getType() == CacheType.WEBCAM) {
             logTypes.add(LogType.WEBCAM_PHOTO_TAKEN);
         } else {
             logTypes.add(LogType.FOUND_IT);
@@ -189,8 +222,7 @@ public abstract class AbstractConnector implements IConnector {
             logTypes.add(LogType.OWNER_MAINTENANCE);
             if (geocache.isDisabled()) {
                 logTypes.add(LogType.ENABLE_LISTING);
-            }
-            else {
+            } else {
                 logTypes.add(LogType.TEMP_DISABLE_LISTING);
             }
             logTypes.add(LogType.ARCHIVE);
@@ -202,7 +234,7 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     @Override
-    public String getWaypointGpxId(final String prefix, final String geocode) {
+    public String getWaypointGpxId(final String prefix, @NonNull final String geocode) {
         // Default: just return the prefix
         return prefix;
     }
@@ -222,7 +254,7 @@ public abstract class AbstractConnector implements IConnector {
     @Override
     @NonNull
     public final Collection<String> getCapabilities() {
-        final ArrayList<String> list = new ArrayList<>();
+        final List<String> list = new ArrayList<>();
         addCapability(list, ISearchByViewPort.class, R.string.feature_search_live_map);
         addCapability(list, ISearchByKeyword.class, R.string.feature_search_keyword);
         addCapability(list, ISearchByCenter.class, R.string.feature_search_center);
@@ -247,19 +279,19 @@ public abstract class AbstractConnector implements IConnector {
         return list;
     }
 
-    private void addCapability(final ArrayList<String> capabilities, final Class<? extends IConnector> clazz, final int featureResourceId) {
+    private void addCapability(final List<String> capabilities, final Class<? extends IConnector> clazz, @StringRes final int featureResourceId) {
         if (clazz.isInstance(this)) {
             capabilities.add(feature(featureResourceId));
         }
     }
 
-    private static String feature(final int featureResourceId) {
+    private static String feature(@StringRes final int featureResourceId) {
         return CgeoApplication.getInstance().getString(featureResourceId);
     }
 
     @Override
-    public @NonNull
-    List<UserAction> getUserActions() {
+    @NonNull
+    public List<UserAction> getUserActions() {
         final List<UserAction> actions = getDefaultUserActions();
 
         if (this instanceof ISearchByOwner) {
@@ -287,9 +319,9 @@ public abstract class AbstractConnector implements IConnector {
     /**
      * @return user actions which are always available (independent of cache or trackable)
      */
-    static @NonNull
-    public List<UserAction> getDefaultUserActions() {
-        final ArrayList<UserAction> actions = new ArrayList<>();
+    @NonNull
+    public static List<UserAction> getDefaultUserActions() {
+        final List<UserAction> actions = new ArrayList<>();
         if (ContactsAddon.isAvailable()) {
             actions.add(new UserAction(R.string.user_menu_open_contact, new Action1<UserAction.Context>() {
 
@@ -304,5 +336,11 @@ public abstract class AbstractConnector implements IConnector {
     }
 
     public void logout() {
+    }
+
+    @Override
+    @Nullable
+    public String getCreateAccountUrl() {
+        return null;
     }
 }

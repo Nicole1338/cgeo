@@ -1,12 +1,12 @@
 package cgeo.geocaching.files;
 
-import butterknife.ButterKnife;
-
 import cgeo.geocaching.Intents;
 import cgeo.geocaching.R;
 import cgeo.geocaching.activity.AbstractListActivity;
 import cgeo.geocaching.activity.ActivityMixin;
+import cgeo.geocaching.utils.TextUtils;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import android.app.AlertDialog;
@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.annotation.LayoutRes;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -34,6 +35,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import butterknife.ButterKnife;
+
 /**
  * Dialog for choosing a file or directory.
  */
@@ -51,14 +54,14 @@ public class SimpleDirChooser extends AbstractListActivity {
         super.onCreate(savedInstanceState);
         final Bundle extras = getIntent().getExtras();
         currentDir = dirContaining(extras.getString(Intents.EXTRA_START_DIR));
-        chooseForWriting = extras.getBoolean(SimpleDirChooser.EXTRA_CHOOSE_FOR_WRITING, false);
+        chooseForWriting = extras.getBoolean(EXTRA_CHOOSE_FOR_WRITING, false);
 
         ActivityMixin.setTheme(this);
         setContentView(R.layout.simple_dir_chooser);
 
         fill(currentDir);
 
-        okButton = (Button) findViewById(R.id.simple_dir_chooser_ok);
+        okButton = ButterKnife.findById(this, R.id.simple_dir_chooser_ok);
         resetOkButton();
         okButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -79,7 +82,7 @@ public class SimpleDirChooser extends AbstractListActivity {
             }
         });
 
-        final EditText pathField = (EditText) findViewById(R.id.simple_dir_chooser_path);
+        final EditText pathField = ButterKnife.findById(this, R.id.simple_dir_chooser_path);
         pathField.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(final View v) {
@@ -123,7 +126,7 @@ public class SimpleDirChooser extends AbstractListActivity {
      * Return the directory containing a given path, or a sensible default.
      *
      * @param path the path to get the enclosing directory from, can be null or empty
-     * @return the directory containing <code>path</code>, or a sensible default if none
+     * @return the directory containing {@code path}, or a sensible default if none
      */
     private static File dirContaining(final String path) {
         return StringUtils.contains(path, File.separatorChar) ?
@@ -134,15 +137,14 @@ public class SimpleDirChooser extends AbstractListActivity {
     private void fill(final File dir) {
         lastPosition = -1;
         resetOkButton();
-        final EditText path = (EditText) findViewById(R.id.simple_dir_chooser_path);
+        final EditText path = ButterKnife.findById(this, R.id.simple_dir_chooser_path);
         path.setText(this.getResources().getString(R.string.simple_dir_chooser_current_path) + " " + dir.getAbsolutePath());
         final File[] dirs = dir.listFiles(new DirOnlyFilenameFilter());
         final List<Option> listDirs = new ArrayList<>();
-        try {
+        if (dirs != null) {
             for (final File currentDir : dirs) {
                 listDirs.add(new Option(currentDir.getName(), currentDir.getAbsolutePath(), currentDir.canWrite()));
             }
-        } catch (final RuntimeException ignored) {
         }
         Collections.sort(listDirs, Option.NAME_COMPARATOR);
         if (dir.getParent() != null) {
@@ -162,10 +164,11 @@ public class SimpleDirChooser extends AbstractListActivity {
     public class FileArrayAdapter extends ArrayAdapter<Option> {
 
         private final Context context;
+        @LayoutRes
         private final int id;
         private final List<Option> items;
 
-        public FileArrayAdapter(final Context context, final int simpleDirItemResId, final List<Option> objects) {
+        public FileArrayAdapter(final Context context, @LayoutRes final int simpleDirItemResId, final List<Option> objects) {
             super(context, simpleDirItemResId, objects);
             this.context = context;
             this.id = simpleDirItemResId;
@@ -222,7 +225,8 @@ public class SimpleDirChooser extends AbstractListActivity {
                 fill(currentDir);
             } else {
                 final File dir = new File(option.getPath());
-                if (dir.list(new DirOnlyFilenameFilter()).length > 0) {
+                final String[] subDirs = dir.list(new DirOnlyFilenameFilter());
+                if (ArrayUtils.isNotEmpty(subDirs)) {
                     currentDir = dir;
                     fill(currentDir);
                 }
@@ -263,11 +267,11 @@ public class SimpleDirChooser extends AbstractListActivity {
         private boolean checked = false;
         private boolean writeable = false;
 
-        private final static Comparator<Option> NAME_COMPARATOR = new Comparator<SimpleDirChooser.Option>() {
+        private static final Comparator<Option> NAME_COMPARATOR = new Comparator<SimpleDirChooser.Option>() {
 
             @Override
             public int compare(final Option lhs, final Option rhs) {
-                return String.CASE_INSENSITIVE_ORDER.compare(lhs.name, rhs.name);
+                return TextUtils.COLLATOR.compare(lhs.name, rhs.name);
             }
 
         };

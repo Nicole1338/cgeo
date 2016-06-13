@@ -10,10 +10,9 @@ import java.io.Reader;
  * Filter reader which can filter out invalid XML characters and character references.
  *
  */
-public class InvalidXMLCharacterFilterReader extends FilterReader
-{
+public class InvalidXMLCharacterFilterReader extends FilterReader {
 
-    public InvalidXMLCharacterFilterReader(Reader in) {
+    public InvalidXMLCharacterFilterReader(final Reader in) {
         super(in);
     }
 
@@ -24,12 +23,12 @@ public class InvalidXMLCharacterFilterReader extends FilterReader
      * and returns decreased value of the original read method. So after last
      * valid character there will be some unused chars in the buffer.
      *
-     * @return Number of read valid characters or <code>-1</code> if end of the
+     * @return Number of read valid characters or {@code -1} if end of the
      *         underling reader was reached.
      */
     @Override
-    public int read(char[] cbuf, int off, int len) throws IOException {
-        int read = super.read(cbuf, off, len);
+    public int read(final char[] cbuf, final int off, final int len) throws IOException {
+        final int read = super.read(cbuf, off, len);
         // check for end
         if (read == -1) {
             return -1;
@@ -48,16 +47,15 @@ public class InvalidXMLCharacterFilterReader extends FilterReader
                 case ';':
                     pos++;
                     if (entityStart >= 0) {
-                        int entityLength = readPos - entityStart + 1;
+                        final int entityLength = readPos - entityStart + 1;
                         if (entityLength <= 5) {
-                            String entity = new String(cbuf, entityStart, entityLength);
+                            final String entity = new String(cbuf, entityStart, entityLength);
                             if (StringUtils.startsWith(entity, "&#")) {
-                                String numberString = StringUtils.substringBetween(entity, "&#", ";");
+                                final String numberString = StringUtils.substringBetween(entity, "&#", ";");
                                 final int value;
                                 if (StringUtils.startsWith(numberString, "x")) {
                                     value = Integer.parseInt(numberString.substring(1), 16);
-                                }
-                                else {
+                                } else {
                                     value = Integer.parseInt(numberString);
                                 }
                                 if (!isValidXMLChar((char) value)) {

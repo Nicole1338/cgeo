@@ -1,18 +1,13 @@
 package cgeo.geocaching.utils;
 
-import cgeo.geocaching.DataStore;
 import cgeo.geocaching.MainActivity;
 import cgeo.geocaching.R;
+import cgeo.geocaching.storage.DataStore;
 import cgeo.geocaching.ui.dialog.Dialogs;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
-
-import rx.functions.Action0;
-import rx.functions.Action1;
-import rx.functions.Func0;
-import rx.schedulers.Schedulers;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
@@ -22,6 +17,11 @@ import android.content.res.Resources;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import rx.functions.Action0;
+import rx.functions.Action1;
+import rx.functions.Func0;
+import rx.schedulers.Schedulers;
 
 public class DatabaseBackupUtils {
 
@@ -38,13 +38,13 @@ public class DatabaseBackupUtils {
      */
     public static void restoreDatabase(final Activity activity) {
         if (!hasBackup()) {
+            Dialogs.message(activity, R.string.init_backup_restore, R.string.init_backup_no_backup_available);
             return;
         }
         final int caches = DataStore.getAllCachesCount();
         if (caches == 0) {
             restoreDatabaseInternal(activity);
-        }
-        else {
+        } else {
             Dialogs.confirm(activity, R.string.init_backup_restore, activity.getString(R.string.restore_confirm_overwrite, activity.getResources().getQuantityString(R.plurals.cache_counts, caches, caches)), new OnClickListener() {
 
                 @Override
@@ -60,7 +60,7 @@ public class DatabaseBackupUtils {
         final Resources res = activity.getResources();
         final ProgressDialog dialog = ProgressDialog.show(activity, res.getString(R.string.init_backup_restore), res.getString(R.string.init_restore_running), true, false);
         final AtomicBoolean restoreSuccessful = new AtomicBoolean(false);
-        RxUtils.andThenOnUi(Schedulers.io(), new Action0() {
+        AndroidRxUtils.andThenOnUi(Schedulers.io(), new Action0() {
             @Override
             public void call() {
                 restoreSuccessful.set(DataStore.restoreDatabaseInternal());
@@ -82,8 +82,6 @@ public class DatabaseBackupUtils {
     /**
      * Create a backup after confirming to overwrite the existing backup.
      *
-     * @param activity
-     * @param runAfterwards
      */
     public static void createBackup(final Activity activity, final Runnable runAfterwards) {
         // avoid overwriting an existing backup with an empty database
@@ -100,8 +98,7 @@ public class DatabaseBackupUtils {
                     createBackupInternal(activity, runAfterwards);
                 }
             });
-        }
-        else {
+        } else {
             createBackupInternal(activity, runAfterwards);
         }
     }
@@ -110,7 +107,7 @@ public class DatabaseBackupUtils {
         final ProgressDialog dialog = ProgressDialog.show(activity,
                 activity.getString(R.string.init_backup),
                 activity.getString(R.string.init_backup_running), true, false);
-        RxUtils.andThenOnUi(Schedulers.io(), new Func0<String>() {
+        AndroidRxUtils.andThenOnUi(Schedulers.io(), new Func0<String>() {
             @Override
             public String call() {
                 return DataStore.backupDatabaseInternal();

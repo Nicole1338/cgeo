@@ -1,34 +1,47 @@
 package cgeo.geocaching;
 
-import butterknife.ButterKnife;
-import butterknife.InjectView;
-
 import cgeo.calendar.CalendarAddon;
 import cgeo.geocaching.activity.AbstractActivity;
-import cgeo.geocaching.activity.AbstractActivity.ActivitySharingInterface;
 import cgeo.geocaching.activity.AbstractViewPagerActivity;
 import cgeo.geocaching.activity.INavigationSource;
 import cgeo.geocaching.activity.Progress;
-import cgeo.geocaching.apps.cache.navi.NavigationAppFactory;
-import cgeo.geocaching.apps.cache.navi.NavigationSelectionActionProvider;
-import cgeo.geocaching.apps.cachelist.MapsWithMeCacheListApp;
+import cgeo.geocaching.apps.cachelist.MapsMeCacheListApp;
+import cgeo.geocaching.apps.navi.NavigationAppFactory;
+import cgeo.geocaching.apps.navi.NavigationSelectionActionProvider;
+import cgeo.geocaching.command.MoveToListAndRemoveFromOthersCommand;
+import cgeo.geocaching.compatibility.Compatibility;
 import cgeo.geocaching.connector.ConnectorFactory;
 import cgeo.geocaching.connector.IConnector;
+import cgeo.geocaching.connector.capability.IgnoreCapability;
 import cgeo.geocaching.connector.gc.GCConnector;
 import cgeo.geocaching.connector.gc.GCConstants;
+import cgeo.geocaching.connector.trackable.TrackableBrand;
+import cgeo.geocaching.connector.trackable.TrackableConnector;
 import cgeo.geocaching.enumerations.CacheAttribute;
 import cgeo.geocaching.enumerations.LoadFlags;
+import cgeo.geocaching.enumerations.LoadFlags.RemoveFlag;
 import cgeo.geocaching.enumerations.LoadFlags.SaveFlag;
+import cgeo.geocaching.enumerations.StatusCode;
 import cgeo.geocaching.enumerations.WaypointType;
+import cgeo.geocaching.export.FieldnoteExport;
+import cgeo.geocaching.export.GpxExport;
 import cgeo.geocaching.gcvote.GCVote;
 import cgeo.geocaching.gcvote.GCVoteDialog;
 import cgeo.geocaching.list.StoredList;
+import cgeo.geocaching.location.Geopoint;
 import cgeo.geocaching.location.Units;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.Trackable;
+import cgeo.geocaching.models.Waypoint;
+import cgeo.geocaching.network.AndroidBeam;
 import cgeo.geocaching.network.HtmlImage;
 import cgeo.geocaching.network.Network;
+import cgeo.geocaching.network.SmileyImage;
+import cgeo.geocaching.playservices.AppInvite;
 import cgeo.geocaching.sensors.GeoData;
 import cgeo.geocaching.sensors.GeoDirHandler;
 import cgeo.geocaching.settings.Settings;
+import cgeo.geocaching.storage.DataStore;
 import cgeo.geocaching.ui.AbstractCachingPageViewCreator;
 import cgeo.geocaching.ui.AnchorAwareLinkMovementMethod;
 import cgeo.geocaching.ui.CacheDetailsCreator;
@@ -41,44 +54,40 @@ import cgeo.geocaching.ui.IndexOutOfBoundsAvoidingTextView;
 import cgeo.geocaching.ui.LoggingUI;
 import cgeo.geocaching.ui.NavigationActionProvider;
 import cgeo.geocaching.ui.OwnerActionsClickListener;
+import cgeo.geocaching.ui.TrackableListAdapter;
 import cgeo.geocaching.ui.WeakReferenceHandler;
 import cgeo.geocaching.ui.dialog.Dialogs;
 import cgeo.geocaching.ui.logs.CacheLogsViewCreator;
+import cgeo.geocaching.utils.AndroidRxUtils;
+import cgeo.geocaching.utils.CancellableHandler;
+import cgeo.geocaching.utils.CheckerUtils;
+import cgeo.geocaching.utils.ClipboardUtils;
 import cgeo.geocaching.utils.CryptUtils;
 import cgeo.geocaching.utils.Formatter;
 import cgeo.geocaching.utils.ImageUtils;
 import cgeo.geocaching.utils.Log;
 import cgeo.geocaching.utils.MatcherWrapper;
-import cgeo.geocaching.utils.RxUtils;
 import cgeo.geocaching.utils.SimpleCancellableHandler;
 import cgeo.geocaching.utils.SimpleHandler;
 import cgeo.geocaching.utils.TextUtils;
 import cgeo.geocaching.utils.UnknownTagsHandler;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.io.Charsets;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
-
-import rx.Observable;
-import rx.Observable.OnSubscribe;
-import rx.Subscriber;
-import rx.Subscription;
-import rx.android.app.AppObservable;
-import rx.functions.Action0;
-import rx.functions.Action1;
-import rx.subscriptions.CompositeSubscription;
-import rx.subscriptions.Subscriptions;
 
 import android.R.color;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
@@ -86,13 +95,13 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
-import android.nfc.NdefMessage;
-import android.nfc.NfcAdapter;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v4.app.FragmentManager;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.view.ActionMode;
 import android.text.Editable;
@@ -102,6 +111,7 @@ import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
+import android.text.util.Linkify;
 import android.util.TypedValue;
 import android.view.ContextMenu;
 import android.view.Menu;
@@ -127,9 +137,26 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import rx.Observable;
+import rx.Observable.OnSubscribe;
+import rx.Subscriber;
+import rx.Subscription;
+import rx.android.app.AppObservable;
+import rx.functions.Action0;
+import rx.functions.Action1;
+import rx.functions.Func0;
+import rx.functions.Func1;
+import rx.schedulers.Schedulers;
+import rx.subscriptions.CompositeSubscription;
+import rx.subscriptions.Subscriptions;
 
 /**
  * Activity to handle all single-cache-stuff.
@@ -137,7 +164,7 @@ import java.util.regex.Pattern;
  * e.g. details, description, logs, waypoints, inventory...
  */
 public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailActivity.Page>
-        implements CacheMenuHandler.ActivityInterface, INavigationSource, ActivitySharingInterface, EditNoteDialogListener {
+        implements CacheMenuHandler.ActivityInterface, INavigationSource, AndroidBeam.ActivitySharingInterface, EditNoteDialogListener {
 
     private static final int MESSAGE_FAILED = -1;
     private static final int MESSAGE_SUCCEEDED = 1;
@@ -151,7 +178,11 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             Pattern.compile("((?<!bg)color)=\"" + "white" + "\"", Pattern.CASE_INSENSITIVE) };
     public static final String STATE_PAGE_INDEX = "cgeo.geocaching.pageIndex";
 
+    // Store Geocode here, as 'cache' is loaded Async.
+    private String geocode;
     private Geocache cache;
+    @NonNull
+    private final List<Trackable> genericTrackables = new ArrayList<>();
     private final Progress progress = new Progress();
 
     private SearchResult search;
@@ -178,6 +209,8 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     private boolean requireGeodata;
     private Subscription geoDataSubscription = Subscriptions.empty();
 
+    private final EnumSet<TrackableBrand> processedBrands = EnumSet.noneOf(TrackableBrand.class);
+
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState, R.layout.cachedetail_activity);
@@ -186,17 +219,13 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         // get parameters
         final Bundle extras = getIntent().getExtras();
-        Uri uri = getIntent().getData();
+        final Uri uri = AndroidBeam.getUri(getIntent());
 
         // try to get data from extras
         String name = null;
-        String geocode = null;
         String guid = null;
 
-        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
-            final NdefMessage msg = (NdefMessage) extras.getParcelableArray(NfcAdapter.EXTRA_NDEF_MESSAGES)[0];
-            uri = Uri.parse("http://" + new String(msg.getRecords()[0].getPayload(), Charsets.UTF_8));
-        } else if (extras != null) {
+        if (extras != null) {
             geocode = extras.getString(Intents.EXTRA_GEOCODE);
             name = extras.getString(Intents.EXTRA_NAME);
             guid = extras.getString(Intents.EXTRA_GUID);
@@ -204,7 +233,11 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         // When clicking a cache in MapsWithMe, we get back a PendingIntent
         if (StringUtils.isEmpty(geocode)) {
-            geocode = MapsWithMeCacheListApp.getCacheFromMapsWithMe(this, getIntent());
+            geocode = MapsMeCacheListApp.getCacheFromMapsWithMe(this, getIntent());
+        }
+
+        if (geocode == null && uri != null) {
+            geocode = ConnectorFactory.getGeocodeFromURL(uri.toString());
         }
 
         // try to get data from URI
@@ -238,31 +271,6 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                         return;
                     }
                 }
-            } else if (uriHost.contains("coord.info")) {
-                if (StringUtils.startsWith(uriPath, "/gc")) {
-                    geocode = uriPath.substring(1).toUpperCase(Locale.US);
-                } else {
-                    showToast(res.getString(R.string.err_detail_open));
-                    finish();
-                    return;
-                }
-            } else if (uriHost.contains("opencaching.de") || uriHost.contains("opencaching.fr")) {
-                if (StringUtils.startsWith(uriPath, "/oc")) {
-                    geocode = uriPath.substring(1).toUpperCase(Locale.US);
-                } else {
-                    geocode = uri.getQueryParameter("wp");
-                    if (StringUtils.isNotBlank(geocode)) {
-                        geocode = geocode.toUpperCase(Locale.US);
-                    } else {
-                        showToast(res.getString(R.string.err_detail_open));
-                        finish();
-                        return;
-                    }
-                }
-            } else {
-                showToast(res.getString(R.string.err_detail_open));
-                finish();
-                return;
             }
         }
 
@@ -282,7 +290,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             String title = res.getString(R.string.cache);
             if (StringUtils.isNotBlank(name)) {
                 title = name;
-            } else if (null != geocode && StringUtils.isNotBlank(geocode)) { // can't be null, but the compiler doesn't understand StringUtils.isNotBlank()
+            } else if (geocode != null && StringUtils.isNotBlank(geocode)) { // can't be null, but the compiler doesn't understand StringUtils.isNotBlank()
                 title = geocode;
             }
             progress.show(this, title, res.getString(R.string.cache_dialog_loading_details), true, loadCacheHandler.cancelMessage());
@@ -305,25 +313,59 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                     loadCacheImages();
                 }
                 requireGeodata = getPage(position) == Page.DETAILS;
-                startOrStopGeoDataListener();
+                startOrStopGeoDataListener(false);
+
+                // cancel contextual actions on page change
+                if (currentActionMode != null) {
+                    currentActionMode.finish();
+                }
             }
         });
         requireGeodata = pageToOpen == 1;
 
         final String realGeocode = geocode;
         final String realGuid = guid;
-        RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+        AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
             @Override
             public void call() {
-                search = Geocache.searchByGeocode(realGeocode, StringUtils.isBlank(realGeocode) ? realGuid : null, 0, false, loadCacheHandler);
+                search = Geocache.searchByGeocode(realGeocode, StringUtils.isBlank(realGeocode) ? realGuid : null, false, loadCacheHandler);
                 loadCacheHandler.sendMessage(Message.obtain());
             }
         });
 
+        // Load Generic Trackables
+        if (StringUtils.isNotBlank(geocode)) {
+            AppObservable.bindActivity(this,
+            // Obtain the active connectors and load trackables in parallel.
+            Observable.from(ConnectorFactory.getGenericTrackablesConnectors()).flatMap(new Func1<TrackableConnector, Observable<Trackable>>() {
+                @Override
+                public Observable<Trackable> call(final TrackableConnector trackableConnector) {
+                    processedBrands.add(trackableConnector.getBrand());
+                    return Observable.defer(new Func0<Observable<Trackable>>() {
+                        @Override
+                        public Observable<Trackable> call() {
+                            return Observable.from(trackableConnector.searchTrackables(geocode));
+                        }
+                    }).subscribeOn(AndroidRxUtils.networkScheduler);
+                }
+            }).toList()).subscribe(new Action1<List<Trackable>>() {
+                @Override
+                public void call(final List<Trackable> trackables) {
+                    // Todo: this is not really a good method, it may lead to duplicates ; ie: in OC connectors.
+                    // Store trackables.
+                    genericTrackables.addAll(trackables);
+                    if (!trackables.isEmpty()) {
+                        // Update the UI if any trackables were found.
+                        notifyDataSetChanged();
+                    }
+                }
+            });
+        }
+
         locationUpdater = new CacheDetailsGeoDirHandler(this);
 
         // If we have a newer Android device setup Android Beam for easy cache sharing
-        initializeAndroidBeam(this);
+        AndroidBeam.enable(this, this);
     }
 
     @Override
@@ -338,17 +380,30 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         outState.putInt(STATE_PAGE_INDEX, getCurrentItem());
     }
 
-    private void startOrStopGeoDataListener() {
-        geoDataSubscription.unsubscribe();
-        if (requireGeodata) {
+    private void startOrStopGeoDataListener(final boolean initial) {
+        final boolean start;
+        if (Settings.useLowPowerMode()) {
+            geoDataSubscription.unsubscribe();
+            start = requireGeodata;
+        } else {
+            start = initial;
+        }
+        if (start) {
             geoDataSubscription = locationUpdater.start(GeoDirHandler.UPDATE_GEODATA);
         }
     }
 
     @Override
+    public void onStart() {
+        super.onStart();
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(updateReceiver, new IntentFilter(Intents.INTENT_CACHE_CHANGED));
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
-        startOrStopGeoDataListener();
+        startOrStopGeoDataListener(true);
 
         if (refreshOnResume) {
             notifyDataSetChanged();
@@ -373,6 +428,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         if (cache != null) {
             cache.setChangeNotificationHandler(null);
         }
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(updateReceiver);
         super.onStop();
     }
 
@@ -384,11 +440,11 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             case R.id.waypoint:
                 menu.setHeaderTitle(selectedWaypoint.getName() + " (" + res.getString(R.string.waypoint) + ")");
                 getMenuInflater().inflate(R.menu.waypoint_options, menu);
-                final boolean isOriginalWaypoint = selectedWaypoint.getWaypointType().equals(WaypointType.ORIGINAL);
+                final boolean isOriginalWaypoint = selectedWaypoint.getWaypointType() == WaypointType.ORIGINAL;
                 menu.findItem(R.id.menu_waypoint_reset_cache_coords).setVisible(isOriginalWaypoint);
                 menu.findItem(R.id.menu_waypoint_edit).setVisible(!isOriginalWaypoint);
                 menu.findItem(R.id.menu_waypoint_duplicate).setVisible(!isOriginalWaypoint);
-                final boolean userDefined = selectedWaypoint.isUserDefined() && !selectedWaypoint.getWaypointType().equals(WaypointType.ORIGINAL);
+                final boolean userDefined = selectedWaypoint.isUserDefined() && selectedWaypoint.getWaypointType() != WaypointType.ORIGINAL;
                 menu.findItem(R.id.menu_waypoint_delete).setVisible(userDefined);
                 final boolean hasCoords = selectedWaypoint.getCoords() != null;
                 final MenuItem defaultNavigationMenu = menu.findItem(R.id.menu_waypoint_navigate_default);
@@ -396,6 +452,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 defaultNavigationMenu.setTitle(NavigationAppFactory.getDefaultNavigationApplication().getName());
                 menu.findItem(R.id.menu_waypoint_navigate).setVisible(hasCoords);
                 menu.findItem(R.id.menu_waypoint_caches_around).setVisible(hasCoords);
+                menu.findItem(R.id.menu_waypoint_copy_coordinates).setVisible(hasCoords);
                 break;
             default:
                 if (imagesList != null) {
@@ -414,6 +471,15 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                     ensureSaved();
                     EditWaypointActivity.startActivityEditWaypoint(this, cache, selectedWaypoint.getId());
                     refreshOnResume = true;
+                }
+                return true;
+            case R.id.menu_waypoint_copy_coordinates:
+                if (selectedWaypoint != null) {
+                    final Geopoint coordinates = selectedWaypoint.getCoords();
+                    if (coordinates != null) {
+                        ClipboardUtils.copyToClipboard(coordinates.toString());
+                        showToast(getResources().getString(R.string.clipboard_copy_ok));
+                    }
                 }
                 return true;
             case R.id.menu_waypoint_duplicate:
@@ -468,7 +534,10 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 return true;
             case R.id.menu_waypoint_caches_around:
                 if (selectedWaypoint != null) {
-                    CacheListActivity.startActivityCoordinates(this, selectedWaypoint.getCoords());
+                    final Geopoint coordinates = selectedWaypoint.getCoords();
+                    if (coordinates != null) {
+                        CacheListActivity.startActivityCoordinates(this, coordinates, selectedWaypoint.getName());
+                    }
                 }
                 return true;
             case R.id.menu_waypoint_reset_cache_coords:
@@ -509,10 +578,19 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     public boolean onPrepareOptionsMenu(final Menu menu) {
         CacheMenuHandler.onPrepareOptionsMenu(menu, cache);
         LoggingUI.onPrepareOptionsMenu(menu, cache);
-        menu.findItem(R.id.menu_store).setVisible(cache != null && !cache.isOffline());
+        menu.findItem(R.id.menu_edit_fieldnote).setVisible(true);
+        menu.findItem(R.id.menu_store_in_list).setVisible(cache != null);
         menu.findItem(R.id.menu_delete).setVisible(cache != null && cache.isOffline());
-        menu.findItem(R.id.menu_refresh).setVisible(cache != null && cache.isOffline());
+        menu.findItem(R.id.menu_refresh).setVisible(cache != null && cache.supportsRefresh());
         menu.findItem(R.id.menu_gcvote).setVisible(cache != null && GCVote.isVotingPossible(cache));
+        menu.findItem(R.id.menu_checker).setVisible(cache != null && StringUtils.isNotEmpty(CheckerUtils.getCheckerUrl(cache)));
+        menu.findItem(R.id.menu_app_invite).setVisible(cache != null && AppInvite.isAvailable());
+        if (cache != null) {
+            final IConnector connector = ConnectorFactory.getConnector(cache);
+            if (connector instanceof IgnoreCapability) {
+                menu.findItem(R.id.menu_ignore).setVisible(((IgnoreCapability) connector).canIgnoreCache(cache));
+            }
+        }
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -528,7 +606,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             case R.id.menu_delete:
                 dropCache();
                 return true;
-            case R.id.menu_store:
+            case R.id.menu_store_in_list:
                 storeCache();
                 return true;
             case R.id.menu_refresh:
@@ -537,10 +615,33 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             case R.id.menu_gcvote:
                 showVoteDialog();
                 return true;
-            default:
+            case R.id.menu_checker:
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(CheckerUtils.getCheckerUrl(cache))));
+                return true;
+            case R.id.menu_ignore:
+                ignoreCache();
+                return true;
+            case R.id.menu_export_gpx:
+                new GpxExport().export(Collections.singletonList(cache), this);
+                return true;
+            case R.id.menu_export_fieldnotes:
+                new FieldnoteExport().export(Collections.singletonList(cache), this);
+                return true;
+            case R.id.menu_edit_fieldnote:
+                ensureSaved();
+                editPersonalNote(cache, this);
+                return true;
+            case R.id.menu_navigate:
                 if (NavigationAppFactory.onMenuItemSelected(item, this, cache)) {
                     return true;
                 }
+                break;
+            case R.id.menu_app_invite:
+                if (AppInvite.isAvailable()) {
+                    AppInvite.send(this, cache);
+                }
+                return true;
+            default:
                 if (LoggingUI.onMenuItemSelected(item, this, cache)) {
                     refreshOnResume = true;
                     return true;
@@ -548,6 +649,24 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void ignoreCache() {
+        Dialogs.confirm(this, R.string.ignore_confirm_title, R.string.ignore_confirm_message, new DialogInterface.OnClickListener() {
+
+            @Override
+            public void onClick(final DialogInterface dialog, final int which) {
+                AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
+                    @Override
+                    public void call() {
+                        ((IgnoreCapability) ConnectorFactory.getConnector(cache)).ignoreCache(cache);
+                    }
+                });
+                // For consistency, remove also the local cache immediately from memory cache and database
+                dropCache();
+                DataStore.removeCache(cache.getGeocode(), EnumSet.of(RemoveFlag.DB));
+            }
+        });
     }
 
     private void showVoteDialog() {
@@ -562,7 +681,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     private static final class CacheDetailsGeoDirHandler extends GeoDirHandler {
         private final WeakReference<CacheDetailActivity> activityRef;
 
-        public CacheDetailsGeoDirHandler(final CacheDetailActivity activity) {
+        CacheDetailsGeoDirHandler(final CacheDetailActivity activity) {
             this.activityRef = new WeakReference<>(activity);
         }
 
@@ -583,18 +702,18 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
     }
 
-    private final static class LoadCacheHandler extends SimpleCancellableHandler {
+    private static final class LoadCacheHandler extends SimpleCancellableHandler {
 
-        public LoadCacheHandler(final CacheDetailActivity activity, final Progress progress) {
+        LoadCacheHandler(final CacheDetailActivity activity, final Progress progress) {
             super(activity, progress);
         }
 
         @Override
         public void handleRegularMessage(final Message msg) {
-            if (UPDATE_LOAD_PROGRESS_DETAIL == msg.what && msg.obj instanceof String) {
+            if (msg.what == UPDATE_LOAD_PROGRESS_DETAIL && msg.obj instanceof String) {
                 updateStatusMsg((String) msg.obj);
             } else {
-                final CacheDetailActivity activity = ((CacheDetailActivity) activityRef.get());
+                final CacheDetailActivity activity = (CacheDetailActivity) activityRef.get();
                 if (activity == null) {
                     return;
                 }
@@ -605,8 +724,12 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                     return;
                 }
 
-                if (activity.search.getError() != null) {
-                    activity.showToast(activity.getResources().getString(R.string.err_dwld_details_failed) + " " + activity.search.getError().getErrorString(activity.getResources()) + ".");
+                if (activity.search.getError() != StatusCode.NO_ERROR) {
+                    // Cache not found is not a download error
+                    final StatusCode error = activity.search.getError();
+                    final Resources res = activity.getResources();
+                    final String toastPrefix = error != StatusCode.CACHE_NOT_FOUND ? res.getString(R.string.err_dwld_details_failed) + " " : "";
+                    activity.showToast(toastPrefix + error.getErrorString(res));
                     dismissProgress();
                     finishActivity();
                     return;
@@ -620,7 +743,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
 
         private void updateStatusMsg(final String msg) {
-            final CacheDetailActivity activity = ((CacheDetailActivity) activityRef.get());
+            final CacheDetailActivity activity = (CacheDetailActivity) activityRef.get();
             if (activity == null) {
                 return;
             }
@@ -672,6 +795,21 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     /**
+     * Receives update notifications from asynchronous processes
+     */
+    private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
+
+        @Override
+        public void onReceive(final Context context, final Intent intent) {
+            if (intent.getBooleanExtra(Intents.EXTRA_WPT_PAGE_UPDATE, false)) {
+                getViewCreator(Page.WAYPOINTS).notifyDataSetChanged();
+            } else {
+                notifyDataSetChanged();
+            }
+        }
+    };
+
+    /**
      * Tries to navigate to the {@link Geocache} of this activity using the default navigation tool.
      */
     @Override
@@ -713,8 +851,8 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         if (imageView == null) {
             return;
         }
-        imagesList = new ImagesList(this, cache.getGeocode());
-        createSubscriptions.add(imagesList.loadImages(imageView, cache.getImages(), false));
+        imagesList = new ImagesList(this, cache.getGeocode(), cache);
+        createSubscriptions.add(imagesList.loadImages(imageView, cache.getNonStaticImages()));
     }
 
     public static void startActivity(final Context context, final String geocode) {
@@ -735,7 +873,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         INVENTORY(R.string.cache_inventory),
         IMAGES(R.string.cache_images);
 
-        final private int titleStringId;
+        private final int titleStringId;
 
         Page(final int titleStringId) {
             this.titleStringId = titleStringId;
@@ -748,7 +886,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             return;
         }
 
-        if (!Network.isNetworkConnected()) {
+        if (!Network.isConnected()) {
             showToast(getString(R.string.err_server));
             return;
         }
@@ -757,7 +895,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         progress.show(this, res.getString(R.string.cache_dialog_refresh_title), res.getString(R.string.cache_dialog_refresh_message), true, refreshCacheHandler.cancelMessage());
 
-        cache.refresh(refreshCacheHandler, RxUtils.refreshScheduler);
+        cache.refresh(refreshCacheHandler, AndroidRxUtils.refreshScheduler);
     }
 
     private void dropCache() {
@@ -776,24 +914,49 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             return;
         }
 
-        if (Settings.getChooseList()) {
+        if (Settings.getChooseList() || cache.isOffline()) {
             // let user select list to store cache in
-            new StoredList.UserInterface(this).promptForListSelection(R.string.list_title,
-                    new Action1<Integer>() {
+            new StoredList.UserInterface(this).promptForMultiListSelection(R.string.lists_title,
+                    new Action1<Set<Integer>>() {
                         @Override
-                        public void call(final Integer selectedListId) {
-                            storeCache(selectedListId, new StoreCacheHandler(CacheDetailActivity.this, progress));
+                        public void call(final Set<Integer> selectedListIds) {
+                            storeCacheInLists(selectedListIds);
                         }
-                    }, true, StoredList.TEMPORARY_LIST.id);
+                    }, true, cache.getLists());
         } else {
-            storeCache(StoredList.TEMPORARY_LIST.id, new StoreCacheHandler(this, progress));
+            storeCacheInLists(Collections.singleton(StoredList.STANDARD_LIST_ID));
+        }
+    }
+
+    private void moveCache() {
+        if (progress.isShowing()) {
+            showToast(res.getString(R.string.err_detail_still_working));
+            return;
+        }
+
+        new MoveToListAndRemoveFromOthersCommand(CacheDetailActivity.this, cache) {
+
+            @Override
+            protected void onFinished() {
+                updateCacheLists(ButterKnife.findById(CacheDetailActivity.this, R.id.offline_lists), cache, res);
+            }
+        }.execute();
+    }
+
+    private void storeCacheInLists(final Set<Integer> selectedListIds) {
+        if (cache.isOffline()) {
+            // cache already offline, just add to another list
+            DataStore.saveLists(Collections.singletonList(cache), selectedListIds);
+            new StoreCacheHandler(CacheDetailActivity.this, progress).sendEmptyMessage(CancellableHandler.DONE);
+        } else {
+            storeCache(selectedListIds);
         }
     }
 
     /**
      * Creator for details-view.
      */
-    private class DetailsViewCreator extends AbstractCachingPageViewCreator<ScrollView> {
+    public class DetailsViewCreator extends AbstractCachingPageViewCreator<ScrollView> {
         // Reference to the details list and favorite line, so that the helper-method can access them without an additional argument
         private LinearLayout detailsList;
         private ImmutablePair<RelativeLayout, TextView> favoriteLine;
@@ -808,7 +971,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             view = (ScrollView) getLayoutInflater().inflate(R.layout.cachedetail_details_page, parentView, false);
 
             // Start loading preview map
-            AppObservable.bindActivity(CacheDetailActivity.this, previewMap).subscribeOn(RxUtils.networkScheduler)
+            AppObservable.bindActivity(CacheDetailActivity.this, previewMap).subscribeOn(AndroidRxUtils.networkScheduler)
                     .subscribe(new Action1<BitmapDrawable>() {
                         @Override
                         public void call(final BitmapDrawable image) {
@@ -884,11 +1047,21 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             }
 
             // cache attributes
-            updateAttributesText();
             updateAttributesIcons();
+            updateAttributesText();
             ButterKnife.findById(view, R.id.attributes_box).setVisibility(cache.getAttributes().isEmpty() ? View.GONE : View.VISIBLE);
 
-            updateOfflineBox(view, cache, res, new RefreshCacheClickListener(), new DropCacheClickListener(), new StoreCacheClickListener());
+            updateOfflineBox(view, cache, res, new RefreshCacheClickListener(), new DropCacheClickListener(), new StoreCacheClickListener(), new OnLongClickListener() {
+
+                @Override
+                public boolean onLongClick(final View v) {
+                    moveCache();
+                    return true;
+                }
+            });
+
+            // list
+            updateCacheLists(view, cache, res);
 
             // watchlist
             final Button buttonWatchlistAdd = ButterKnife.findById(view, R.id.add_to_watchlist);
@@ -904,17 +1077,12 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             buttonFavPointRemove.setOnClickListener(new FavoriteRemoveClickListener());
             updateFavPointBox();
 
-            // list
-            final Button buttonChangeList = ButterKnife.findById(view, R.id.change_list);
-            buttonChangeList.setOnClickListener(new ChangeListClickListener());
-            updateListBox();
-
             // data license
             final IConnector connector = ConnectorFactory.getConnector(cache);
             final String license = connector.getLicenseText(cache);
             if (StringUtils.isNotBlank(license)) {
                 view.findViewById(R.id.license_box).setVisibility(View.VISIBLE);
-                final TextView licenseView = (ButterKnife.findById(view, R.id.license));
+                final TextView licenseView = ButterKnife.findById(view, R.id.license);
                 licenseView.setText(Html.fromHtml(license), BufferType.SPANNABLE);
                 licenseView.setClickable(true);
                 licenseView.setMovementMethod(AnchorAwareLinkMovementMethod.getInstance());
@@ -928,7 +1096,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         private void updateAttributesIcons() {
             final GridView gridView = ButterKnife.findById(view, R.id.attributes_grid);
             final List<String> attributes = cache.getAttributes();
-            if (attributes.isEmpty()) {
+            if (!CacheAttribute.hasRecognizedAttributeIcon(attributes)) {
                 gridView.setVisibility(View.GONE);
                 return;
             }
@@ -936,7 +1104,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             gridView.setVisibility(View.VISIBLE);
             gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
-                public void onItemClick(final android.widget.AdapterView<?> parent, final View view, final int position, final long id) {
+                public void onItemClick(final AdapterView<?> parent, final View view, final int position, final long id) {
                     toggleAttributesView();
                 }
             });
@@ -957,27 +1125,32 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 return;
             }
             final StringBuilder text = new StringBuilder();
-            for (String attributeName : attributes) {
+            for (final String attributeName : attributes) {
                 final boolean enabled = CacheAttribute.isEnabled(attributeName);
                 // search for a translation of the attribute
                 final CacheAttribute attrib = CacheAttribute.getByRawName(CacheAttribute.trimAttributeName(attributeName));
+                String attributeNameL10n = attributeName;
                 if (attrib != null) {
-                    attributeName = attrib.getL10n(enabled);
+                    attributeNameL10n = attrib.getL10n(enabled);
                 }
                 if (text.length() > 0) {
                     text.append('\n');
                 }
-                text.append(attributeName);
+                text.append(attributeNameL10n);
             }
             attribView.setText(text);
-            attribView.setVisibility(View.GONE);
-            attribView.setOnClickListener(new OnClickListener() {
+            if (ButterKnife.findById(view, R.id.attributes_grid).getVisibility() == View.VISIBLE) {
+                attribView.setVisibility(View.GONE);
+                attribView.setOnClickListener(new OnClickListener() {
 
-                @Override
-                public void onClick(final View v) {
-                    toggleAttributesView();
-                }
-            });
+                    @Override
+                    public void onClick(final View v) {
+                        toggleAttributesView();
+                    }
+                });
+            } else {
+                attribView.setVisibility(View.VISIBLE);
+            }
         }
 
         private class StoreCacheClickListener implements View.OnClickListener {
@@ -988,17 +1161,17 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
         }
 
-        private class RefreshCacheClickListener implements View.OnClickListener {
-            @Override
-            public void onClick(final View arg0) {
-                refreshCache();
-            }
-        }
-
         private class DropCacheClickListener implements View.OnClickListener {
             @Override
             public void onClick(final View arg0) {
                 dropCache();
+            }
+        }
+
+        private class RefreshCacheClickListener implements View.OnClickListener {
+            @Override
+            public void onClick(final View arg0) {
+                refreshCache();
             }
         }
 
@@ -1022,7 +1195,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                     return;
                 }
                 progress.show(CacheDetailActivity.this, res.getString(titleId), res.getString(messageId), true, null);
-                RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+                AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
                     @Override
                     public void call() {
                         action.call(handler);
@@ -1136,38 +1309,6 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
 
         /**
-         * Listener for "change list" button
-         */
-        private class ChangeListClickListener implements View.OnClickListener {
-            @Override
-            public void onClick(final View v) {
-                new StoredList.UserInterface(CacheDetailActivity.this).promptForListSelection(R.string.list_title,
-                        new Action1<Integer>() {
-                            @Override
-                            public void call(final Integer selectedListId) {
-                                switchListById(selectedListId);
-                            }
-                        }, true, cache.getListId());
-            }
-        }
-
-        /**
-         * move cache to another list
-         *
-         * @param listId
-         *            the ID of the list
-         */
-        public void switchListById(final int listId) {
-            if (listId < 0) {
-                return;
-            }
-
-            Settings.saveLastList(listId);
-            DataStore.moveToList(cache, listId);
-            updateListBox();
-        }
-
-        /**
          * Show/hide buttons, set text in watchlist box
          */
         private void updateWatchlistBox() {
@@ -1181,14 +1322,24 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             final Button buttonRemove = ButterKnife.findById(view, R.id.remove_from_watchlist);
             final TextView text = ButterKnife.findById(view, R.id.watchlist_text);
 
+            final int watchListCount = cache.getWatchlistCount();
+
             if (cache.isOnWatchlist() || cache.isOwner()) {
                 buttonAdd.setVisibility(View.GONE);
                 buttonRemove.setVisibility(View.VISIBLE);
-                text.setText(R.string.cache_watchlist_on);
+                if (watchListCount != -1) {
+                    text.setText(res.getString(R.string.cache_watchlist_on_extra, watchListCount));
+                } else {
+                    text.setText(R.string.cache_watchlist_on);
+                }
             } else {
                 buttonAdd.setVisibility(View.VISIBLE);
                 buttonRemove.setVisibility(View.GONE);
-                text.setText(R.string.cache_watchlist_not_on);
+                if (watchListCount != -1) {
+                    text.setText(res.getString(R.string.cache_watchlist_not_on_extra, watchListCount));
+                } else {
+                    text.setText(R.string.cache_watchlist_not_on);
+                }
             }
 
             // the owner of a cache has it always on his watchlist. Adding causes an error
@@ -1241,25 +1392,6 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             }
         }
 
-        /**
-         * shows/hides/updates list box
-         */
-        private void updateListBox() {
-            final View box = view.findViewById(R.id.list_box);
-
-            if (cache.isOffline()) {
-                // show box
-                box.setVisibility(View.VISIBLE);
-
-                // update text
-                final TextView text = ButterKnife.findById(view, R.id.list_text);
-                final StoredList list = DataStore.getList(cache.getListId());
-                text.setText(res.getString(R.string.cache_list_text) + " " + list.title);
-            } else {
-                // hide box
-                box.setVisibility(View.GONE);
-            }
-        }
     }
 
     private final Observable<BitmapDrawable> previewMap = Observable.create(new OnSubscribe<BitmapDrawable>() {
@@ -1269,11 +1401,9 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 // persistent preview from storage
                 Bitmap image = StaticMapsProvider.getPreviewMap(cache);
 
-                if (image == null) {
-                    if (Settings.isStoreOfflineMaps() && cache.getCoords() != null) {
-                        RxUtils.waitForCompletion(StaticMapsProvider.storeCachePreviewMap(cache));
-                        image = StaticMapsProvider.getPreviewMap(cache);
-                    }
+                if (image == null && Settings.isStoreOfflineMaps() && cache.getCoords() != null) {
+                    StaticMapsProvider.storeCachePreviewMap(cache).await();
+                    image = StaticMapsProvider.getPreviewMap(cache);
                 }
 
                 if (image != null) {
@@ -1288,13 +1418,16 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
     });
 
+    /**
+     * Reflect the (contextual) action mode of the action bar.
+     */
+    protected ActionMode currentActionMode;
+
     protected class DescriptionViewCreator extends AbstractCachingPageViewCreator<ScrollView> {
 
-        @InjectView(R.id.personalnote) protected TextView personalNoteView;
-        @InjectView(R.id.shortdesc) protected IndexOutOfBoundsAvoidingTextView shortDescView;
-        @InjectView(R.id.longdesc) protected IndexOutOfBoundsAvoidingTextView longDescView;
-        @InjectView(R.id.show_description) protected Button showDesc;
-        @InjectView(R.id.loading) protected View loadingView;
+        @BindView(R.id.personalnote) protected TextView personalNoteView;
+        @BindView(R.id.description) protected IndexOutOfBoundsAvoidingTextView descView;
+        @BindView(R.id.loading) protected View loadingView;
 
         @Override
         public ScrollView getDispatchedView(final ViewGroup parentView) {
@@ -1304,26 +1437,16 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             }
 
             view = (ScrollView) getLayoutInflater().inflate(R.layout.cachedetail_description_page, parentView, false);
-            ButterKnife.inject(this, view);
+            ButterKnife.bind(this, view);
 
             // cache short description
             if (StringUtils.isNotBlank(cache.getShortDescription())) {
-                loadDescription(cache.getShortDescription(), shortDescView, null);
+                loadDescription(cache.getShortDescription(), descView, null);
             }
 
             // long description
             if (StringUtils.isNotBlank(cache.getDescription())) {
-                if (Settings.isAutoLoadDescription()) {
-                    loadLongDescription();
-                } else {
-                    showDesc.setVisibility(View.VISIBLE);
-                    showDesc.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(final View arg0) {
-                            loadLongDescription();
-                        }
-                    });
-                }
+                loadLongDescription();
             }
 
             // cache personal note
@@ -1339,7 +1462,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 }
             });
             final Button personalNoteUpload = ButterKnife.findById(view, R.id.upload_personalnote);
-            if (cache.isOffline() && ConnectorFactory.getConnector(cache).supportsPersonalNote()) {
+            if (ConnectorFactory.getConnector(cache).supportsPersonalNote()) {
                 personalNoteUpload.setVisibility(View.VISIBLE);
                 personalNoteUpload.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -1363,13 +1486,12 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 hintBoxView.setVisibility(View.GONE);
             }
 
-            final TextView hintView = (ButterKnife.findById(view, R.id.hint));
+            final TextView hintView = ButterKnife.findById(view, R.id.hint);
             if (StringUtils.isNotBlank(cache.getHint())) {
                 if (TextUtils.containsHtml(cache.getHint())) {
-                    hintView.setText(Html.fromHtml(cache.getHint(), new HtmlImage(cache.getGeocode(), false, cache.getListId(), false), null), TextView.BufferType.SPANNABLE);
+                    hintView.setText(Html.fromHtml(cache.getHint(), new HtmlImage(cache.getGeocode(), false, false, false), null), TextView.BufferType.SPANNABLE);
                     hintView.setText(CryptUtils.rot13((Spannable) hintView.getText()));
-                }
-                else {
+                } else {
                     hintView.setText(CryptUtils.rot13(cache.getHint()));
                 }
                 hintView.setVisibility(View.VISIBLE);
@@ -1386,7 +1508,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 hintBoxView.setOnClickListener(null);
             }
 
-            final TextView spoilerlinkView = (ButterKnife.findById(view, R.id.hint_spoilerlink));
+            final TextView spoilerlinkView = ButterKnife.findById(view, R.id.hint_spoilerlink);
             if (CollectionUtils.isNotEmpty(cache.getSpoilers())) {
                 spoilerlinkView.setVisibility(View.VISIBLE);
                 spoilerlinkView.setClickable(true);
@@ -1416,16 +1538,15 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             final Message cancelMessage = myHandler.cancelMessage(res.getString(R.string.cache_personal_note_upload_cancelled));
             progress.show(CacheDetailActivity.this, res.getString(R.string.cache_personal_note_uploading), res.getString(R.string.cache_personal_note_uploading), true, cancelMessage);
 
-            myHandler.unsubscribeIfCancelled(RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+            myHandler.unsubscribeIfCancelled(AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
                 @Override
                 public void call() {
                     final IConnector con = ConnectorFactory.getConnector(cache);
-                    if (con.supportsPersonalNote()) {
-                        con.uploadPersonalNote(cache);
-                    }
+                    final boolean success = con.uploadPersonalNote(cache);
                     final Message msg = Message.obtain();
                     final Bundle bundle = new Bundle();
-                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT, CgeoApplication.getInstance().getString(R.string.cache_personal_note_upload_done));
+                    bundle.putString(SimpleCancellableHandler.MESSAGE_TEXT,
+                            CgeoApplication.getInstance().getString(success ? R.string.cache_personal_note_upload_done : R.string.cache_personal_note_upload_error));
                     msg.setData(bundle);
                     myHandler.sendMessage(msg);
                 }
@@ -1433,12 +1554,10 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         }
 
         private void loadLongDescription() {
-            showDesc.setVisibility(View.GONE);
-            showDesc.setOnClickListener(null);
             loadingView.setVisibility(View.VISIBLE);
 
             final String longDescription = cache.getDescription();
-            loadDescription(longDescription, longDescView, loadingView);
+            loadDescription(longDescription, descView, loadingView);
         }
 
         private void warnPersonalNoteExceedsLimit() {
@@ -1452,6 +1571,48 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                         }
 
                     });
+        }
+
+        /**
+         * Load the description in the background.
+         *
+         * @param descriptionString
+         *            the HTML description as retrieved from the connector
+         * @param descriptionView
+         *            the view to fill
+         * @param loadingIndicatorView
+         *            the loading indicator view, will be hidden when completed
+         */
+        private void loadDescription(final String descriptionString, final IndexOutOfBoundsAvoidingTextView descriptionView, final View loadingIndicatorView) {
+            try {
+                final UnknownTagsHandler unknownTagsHandler = new UnknownTagsHandler();
+                final Spanned description = Html.fromHtml(descriptionString, new HtmlImage(cache.getGeocode(), true, false, descriptionView, false), unknownTagsHandler);
+                addWarning(unknownTagsHandler, description);
+                if (StringUtils.isNotBlank(descriptionString)) {
+                    try {
+                        if (descriptionView.getText().length() == 0) {
+                            descriptionView.setText(description, TextView.BufferType.SPANNABLE);
+                        } else {
+                            descriptionView.append("\n" + description);
+                        }
+                    } catch (final Exception e) {
+                        // On 4.1, there is sometimes a crash on measuring the layout: https://code.google.com/p/android/issues/detail?id=35412
+                        Log.e("Android bug setting text: ", e);
+                        // remove the formatting by converting to a simple string
+                        descriptionView.append(description.toString());
+                    }
+                    descriptionView.setMovementMethod(AnchorAwareLinkMovementMethod.getInstance());
+                    fixTextColor(descriptionString, descriptionView);
+                    descriptionView.setVisibility(View.VISIBLE);
+                    addContextMenu(descriptionView);
+                    potentiallyHideShortDescription();
+                }
+                if (loadingIndicatorView != null) {
+                    loadingIndicatorView.setVisibility(View.GONE);
+                }
+            } catch (final RuntimeException ignored) {
+                showToast(res.getString(R.string.err_load_descr_failed));
+            }
         }
 
     }
@@ -1468,39 +1629,6 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 ((Editable) description).append("\n\n").append(tableNote);
                 ((Editable) description).setSpan(new StyleSpan(Typeface.ITALIC), startPos, description.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
-        }
-    }
-    /**
-     * Load the description in the background.
-     * @param descriptionString the HTML description as retrieved from the connector
-     * @param descriptionView the view to fill
-     * @param loadingIndicatorView the loading indicator view, will be hidden when completed
-     */
-    private void loadDescription(final String descriptionString, final IndexOutOfBoundsAvoidingTextView descriptionView, final View loadingIndicatorView) {
-        try {
-            final UnknownTagsHandler unknownTagsHandler = new UnknownTagsHandler();
-            final Spanned description = Html.fromHtml(descriptionString, new HtmlImage(cache.getGeocode(), true, cache.getListId(), false, descriptionView), unknownTagsHandler);
-            addWarning(unknownTagsHandler, description);
-            if (StringUtils.isNotBlank(descriptionString)) {
-                try {
-                    descriptionView.setText(description, TextView.BufferType.SPANNABLE);
-                } catch (final Exception e) {
-                    // On 4.1, there is sometimes a crash on measuring the layout: https://code.google.com/p/android/issues/detail?id=35412
-                    Log.e("Android bug setting text: ", e);
-                    // remove the formatting by converting to a simple string
-                    descriptionView.setText(description.toString());
-                }
-                descriptionView.setMovementMethod(AnchorAwareLinkMovementMethod.getInstance());
-                fixTextColor(descriptionString, descriptionView);
-                descriptionView.setVisibility(View.VISIBLE);
-                addContextMenu(descriptionView);
-                potentiallyHideShortDescription();
-            }
-            if (null != loadingIndicatorView) {
-                loadingIndicatorView.setVisibility(View.GONE);
-            }
-        } catch (final Exception ignored) {
-            showToast(res.getString(R.string.err_load_descr_failed));
         }
     }
 
@@ -1534,7 +1662,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
      * Hide the short description, if it is contained somewhere at the start of the long description.
      */
     public void potentiallyHideShortDescription() {
-        final View shortView = ButterKnife.findById(this, R.id.shortdesc);
+        final View shortView = ButterKnife.findById(this, R.id.description);
         if (shortView == null) {
             return;
         }
@@ -1554,7 +1682,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     private void ensureSaved() {
         if (!cache.isOffline()) {
             showToast(getString(R.string.info_cache_saved));
-            cache.setListId(StoredList.STANDARD_LIST_ID);
+            cache.getLists().add(StoredList.STANDARD_LIST_ID);
             new AsyncTask<Void, Void, Void>() {
                 @Override
                 protected Void doInBackground(final Void... params) {
@@ -1562,6 +1690,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                     return null;
                 }
             }.execute();
+            notifyDataSetChanged();
         }
     }
 
@@ -1597,14 +1726,14 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 @Override
                 public View getView(final int position, final View convertView, final ViewGroup parent) {
                     View rowView = convertView;
-                    if (null == rowView) {
+                    if (rowView == null) {
                         rowView = getLayoutInflater().inflate(R.layout.waypoint_item, parent, false);
                         rowView.setClickable(true);
                         rowView.setLongClickable(true);
                         registerForContextMenu(rowView);
                     }
                     WaypointViewHolder holder = (WaypointViewHolder) rowView.getTag();
-                    if (null == holder) {
+                    if (holder == null) {
                         holder = new WaypointViewHolder(rowView);
                     }
 
@@ -1620,12 +1749,12 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         protected void fillViewHolder(final View rowView, final WaypointViewHolder holder, final Waypoint wpt) {
             // coordinates
             final TextView coordinatesView = holder.coordinatesView;
-            if (null != wpt.getCoords()) {
-                coordinatesView.setOnClickListener(new CoordinatesFormatSwitcher(wpt.getCoords()));
-                coordinatesView.setText(wpt.getCoords().toString());
+            final Geopoint coordinates = wpt.getCoords();
+            if (coordinates != null) {
+                coordinatesView.setOnClickListener(new CoordinatesFormatSwitcher(coordinates));
+                coordinatesView.setText(coordinates.toString());
                 coordinatesView.setVisibility(View.VISIBLE);
-            }
-            else {
+            } else {
                 coordinatesView.setVisibility(View.GONE);
             }
 
@@ -1635,8 +1764,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             if (StringUtils.isNotBlank(waypointInfo)) {
                 infoView.setText(waypointInfo);
                 infoView.setVisibility(View.VISIBLE);
-            }
-            else {
+            } else {
                 infoView.setVisibility(View.GONE);
             }
 
@@ -1644,8 +1772,8 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             final TextView nameView = holder.nameView;
             if (StringUtils.isNotBlank(wpt.getName())) {
                 nameView.setText(StringEscapeUtils.unescapeHtml4(wpt.getName()));
-            } else if (null != wpt.getCoords()) {
-                nameView.setText(wpt.getCoords().toString());
+            } else if (coordinates != null) {
+                nameView.setText(coordinates.toString());
             } else {
                 nameView.setText(res.getString(R.string.waypoint));
             }
@@ -1667,13 +1795,11 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                 noteView.setOnClickListener(new DecryptTextClickListener(noteView));
                 noteView.setVisibility(View.VISIBLE);
                 if (TextUtils.containsHtml(wpt.getNote())) {
-                    noteView.setText(Html.fromHtml(wpt.getNote()), TextView.BufferType.SPANNABLE);
-                }
-                else {
+                    noteView.setText(Html.fromHtml(wpt.getNote(), new SmileyImage(cache.getGeocode(), noteView), new UnknownTagsHandler()), TextView.BufferType.SPANNABLE);
+                } else {
                     noteView.setText(wpt.getNote());
                 }
-            }
-            else {
+            } else {
                 noteView.setVisibility(View.GONE);
             }
 
@@ -1718,13 +1844,13 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             final Drawable icon;
             if (wpt.isVisited()) {
                 final LayerDrawable ld = new LayerDrawable(new Drawable[] {
-                        res.getDrawable(waypointType.markerId),
-                        res.getDrawable(R.drawable.tick) });
+                        Compatibility.getDrawable(res, waypointType.markerId),
+                        Compatibility.getDrawable(res, R.drawable.tick) });
                 ld.setLayerInset(0, 0, 0, visitedInset, visitedInset);
                 ld.setLayerInset(1, visitedInset, visitedInset, 0, 0);
                 icon = ld;
             } else {
-                icon = res.getDrawable(waypointType.markerId);
+                icon = Compatibility.getDrawable(res, waypointType.markerId);
             }
             nameView.setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null);
         }
@@ -1743,14 +1869,23 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
             // TODO: fix layout, then switch back to Android-resource and delete copied one
             // this copy is modified to respect the text color
-            view.setAdapter(new ArrayAdapter<>(CacheDetailActivity.this, R.layout.simple_list_item_1, cache.getInventory()));
+            final TrackableListAdapter adapterTrackables = new TrackableListAdapter(CacheDetailActivity.this);
+            cache.mergeInventory(genericTrackables, processedBrands);
+
+            // Todo: don't hesitate to use addAll() on adapter, once API Level reach 11 (as of today level is 9)
+            //adapterTrackables.addAll(cache.getInventory());
+            for (final Trackable trackable : cache.getInventory()) {
+                adapterTrackables.add(trackable);
+            }
+
+            view.setAdapter(adapterTrackables);
             view.setOnItemClickListener(new OnItemClickListener() {
                 @Override
                 public void onItemClick(final AdapterView<?> arg0, final View arg1, final int arg2, final long arg3) {
                     final Object selection = arg0.getItemAtPosition(arg2);
                     if (selection instanceof Trackable) {
                         final Trackable trackable = (Trackable) selection;
-                        TrackableActivity.startActivity(CacheDetailActivity.this, trackable.getGuid(), trackable.getGeocode(), trackable.getName());
+                        TrackableActivity.startActivity(CacheDetailActivity.this, trackable.getGuid(), trackable.getGeocode(), trackable.getName(), cache.getGeocode(), trackable.getBrand().getId());
                     }
                 }
             });
@@ -1782,28 +1917,77 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         context.startActivity(cachesIntent);
     }
 
+    private ActionMode mActionMode = null;
+    private boolean mSelectionModeActive = false;
+    private IndexOutOfBoundsAvoidingTextView selectedTextView;
+
+    private class TextMenuItemClickListener implements MenuItem.OnMenuItemClickListener {
+
+        @Override
+        public boolean onMenuItemClick(final MenuItem menuItem) {
+            final int startSelection = selectedTextView.getSelectionStart();
+            final int endSelection = selectedTextView.getSelectionEnd();
+            clickedItemText = selectedTextView.getText().subSequence(startSelection, endSelection);
+            return onClipboardItemSelected(mActionMode, menuItem, clickedItemText);
+        }
+    }
+
+    @Override
+    public void onSupportActionModeStarted(final ActionMode mode) {
+        if (mSelectionModeActive && selectedTextView != null) {
+            mSelectionModeActive = false;
+            mActionMode = mode;
+            final Menu menu = mode.getMenu();
+            mode.getMenuInflater().inflate(R.menu.details_context, menu);
+            menu.findItem(R.id.menu_copy).setVisible(false);
+            menu.findItem(R.id.menu_cache_share_field).setOnMenuItemClickListener(new TextMenuItemClickListener());
+            menu.findItem(R.id.menu_translate_to_sys_lang).setOnMenuItemClickListener(new TextMenuItemClickListener());
+            menu.findItem(R.id.menu_translate_to_english).setOnMenuItemClickListener(new TextMenuItemClickListener());
+            buildDetailsContextMenu(mode, menu, res.getString(R.string.cache_description), false);
+            selectedTextView.setWindowFocusWait(true);
+        }
+        super.onSupportActionModeStarted(mode);
+    }
+
+    @Override
+    public void onSupportActionModeFinished(final ActionMode mode) {
+        mActionMode = null;
+        if (selectedTextView != null) {
+            selectedTextView.setWindowFocusWait(false);
+        }
+        if (!mSelectionModeActive) {
+            selectedTextView = null;
+        }
+        super.onSupportActionModeFinished(mode);
+    }
+
     @Override
     public void addContextMenu(final View view) {
         view.setOnLongClickListener(new OnLongClickListener() {
 
             @Override
             public boolean onLongClick(final View v) {
-                startSupportActionMode(new ActionMode.Callback() {
+                if ((Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.HONEYCOMB)
+                        && ((view.getId() == R.id.description) || (view.getId() == R.id.hint))) {
+                    selectedTextView = (IndexOutOfBoundsAvoidingTextView) view;
+                    mSelectionModeActive = true;
+                    return false;
+                }
+                currentActionMode = startSupportActionMode(new ActionMode.Callback() {
 
                     @Override
                     public boolean onPrepareActionMode(final ActionMode actionMode, final Menu menu) {
+                        return prepareClipboardActionMode(view, actionMode, menu);
+                    }
+
+                    private boolean prepareClipboardActionMode(final View view, final ActionMode actionMode, final Menu menu) {
                         switch (view.getId()) {
                             case R.id.value: // coordinates, gc-code, name
-                                assert view instanceof TextView;
                                 clickedItemText = ((TextView) view).getText();
                                 final CharSequence itemTitle = ((TextView) ((View) view.getParent()).findViewById(R.id.name)).getText();
                                 buildDetailsContextMenu(actionMode, menu, itemTitle, true);
                                 return true;
-                            case R.id.shortdesc:
-                                clickedItemText = cache.getShortDescription();
-                                buildDetailsContextMenu(actionMode, menu, res.getString(R.string.cache_description), false);
-                                return true;
-                            case R.id.longdesc:
+                            case R.id.description:
                                 // combine short and long description
                                 final String shortDesc = cache.getShortDescription();
                                 if (StringUtils.isBlank(shortDesc)) {
@@ -1822,7 +2006,6 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                                 buildDetailsContextMenu(actionMode, menu, res.getString(R.string.cache_hint), false);
                                 return true;
                             case R.id.log:
-                                assert view instanceof TextView;
                                 clickedItemText = ((TextView) view).getText();
                                 buildDetailsContextMenu(actionMode, menu, res.getString(R.string.cache_logs), false);
                                 return true;
@@ -1837,13 +2020,13 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
                     @Override
                     public void onDestroyActionMode(final ActionMode actionMode) {
-                        // do nothing
+                        currentActionMode = null;
                     }
 
                     @Override
                     public boolean onCreateActionMode(final ActionMode actionMode, final Menu menu) {
                         actionMode.getMenuInflater().inflate(R.menu.details_context, menu);
-
+                        prepareClipboardActionMode(view, actionMode, menu);
                         // Return true so that the action mode is shown
                         return true;
                     }
@@ -1851,12 +2034,12 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
                     @Override
                     public boolean onActionItemClicked(final ActionMode actionMode, final MenuItem menuItem) {
                         switch (menuItem.getItemId()) {
-                        // detail fields
+                            // detail fields
                             case R.id.menu_calendar:
                                 CalendarAddon.addToCalendarWithIntent(CacheDetailActivity.this, cache);
                                 actionMode.finish();
                                 return true;
-                                // handle clipboard actions in base
+                            // handle clipboard actions in base
                             default:
                                 return onClipboardItemSelected(actionMode, menuItem, clickedItemText);
                         }
@@ -1882,7 +2065,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.waypoint_reset_cache_coords);
 
-        final String[] items = new String[] { res.getString(R.string.waypoint_localy_reset_cache_coords), res.getString(R.string.waypoint_reset_local_and_remote_cache_coords) };
+        final String[] items = { res.getString(R.string.waypoint_localy_reset_cache_coords), res.getString(R.string.waypoint_reset_local_and_remote_cache_coords) };
         builder.setSingleChoiceItems(items, 0, new DialogInterface.OnClickListener() {
 
             @Override
@@ -1931,7 +2114,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     private void resetCoords(final Geocache cache, final Handler handler, final Waypoint wpt, final boolean local, final boolean remote, final ProgressDialog progress) {
-        RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+        AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
             @Override
             public void call() {
                 if (local) {
@@ -2002,10 +2185,10 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
         if (CollectionUtils.isNotEmpty(cache.getFriendsLogs())) {
             pages.add(Page.LOGSFRIENDS);
         }
-        if (CollectionUtils.isNotEmpty(cache.getInventory())) {
+        if (CollectionUtils.isNotEmpty(cache.getInventory()) || CollectionUtils.isNotEmpty(genericTrackables)) {
             pages.add(Page.INVENTORY);
         }
-        if (CollectionUtils.isNotEmpty(cache.getImages())) {
+        if (CollectionUtils.isNotEmpty(cache.getNonStaticImages())) {
             pages.add(Page.IMAGES);
         }
         return new ImmutablePair<List<? extends Page>, Integer>(pages, detailsIndex);
@@ -2040,13 +2223,25 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     static void updateOfflineBox(final View view, final Geocache cache, final Resources res,
-                                        final OnClickListener refreshCacheClickListener,
-                                        final OnClickListener dropCacheClickListener,
-                                        final OnClickListener storeCacheClickListener) {
+            final OnClickListener refreshCacheClickListener,
+            final OnClickListener dropCacheClickListener,
+            final OnClickListener storeCacheClickListener,
+            final OnLongClickListener moveCacheListener) {
         // offline use
         final TextView offlineText = ButterKnife.findById(view, R.id.offline_text);
         final Button offlineRefresh = ButterKnife.findById(view, R.id.offline_refresh);
         final Button offlineStore = ButterKnife.findById(view, R.id.offline_store);
+        final Button offlineDrop = ButterKnife.findById(view, R.id.offline_drop);
+
+        offlineStore.setClickable(true);
+        offlineStore.setOnClickListener(storeCacheClickListener);
+        if (moveCacheListener != null) {
+            offlineStore.setOnLongClickListener(moveCacheListener);
+        }
+
+        offlineRefresh.setVisibility(cache.supportsRefresh() ? View.VISIBLE : View.GONE);
+        offlineRefresh.setClickable(true);
+        offlineRefresh.setOnClickListener(refreshCacheClickListener);
 
         if (cache.isOffline()) {
             final long diff = (System.currentTimeMillis() / (60 * 1000)) - (cache.getDetailedUpdate() / (60 * 1000)); // minutes
@@ -2055,31 +2250,40 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
             if (diff < 15) {
                 ago = res.getString(R.string.cache_offline_time_mins_few);
             } else if (diff < 50) {
-                ago = res.getString(R.string.cache_offline_time_about) + " " + diff + " " + res.getString(R.string.cache_offline_time_mins);
-            } else if (diff < 90) {
-                ago = res.getString(R.string.cache_offline_time_about) + " " + res.getString(R.string.cache_offline_time_hour);
+                ago = res.getQuantityString(R.plurals.cache_offline_about_time_mins, (int) diff, (int) diff);
             } else if (diff < (48 * 60)) {
-                ago = res.getString(R.string.cache_offline_time_about) + " " + (diff / 60) + " " + res.getString(R.string.cache_offline_time_hours);
+                ago = res.getQuantityString(R.plurals.cache_offline_about_time_hours, (int) (diff / 60), (int) (diff / 60));
             } else {
-                ago = res.getString(R.string.cache_offline_time_about) + " " + (diff / (24 * 60)) + " " + res.getString(R.string.cache_offline_time_days);
+                ago = res.getQuantityString(R.plurals.cache_offline_about_time_days, (int) (diff / (24 * 60)), (int) (diff / (24 * 60)));
             }
 
             offlineText.setText(res.getString(R.string.cache_offline_stored) + "\n" + ago);
-            offlineRefresh.setOnClickListener(refreshCacheClickListener);
 
-            offlineStore.setText(res.getString(R.string.cache_offline_drop));
-            offlineStore.setClickable(true);
-            offlineStore.setOnClickListener(dropCacheClickListener);
+            if (offlineDrop != null) {
+                offlineDrop.setOnClickListener(dropCacheClickListener);
+                offlineDrop.setClickable(true);
+                offlineDrop.setVisibility(View.VISIBLE);
+            }
+
+            offlineStore.setText(R.string.cache_offline_manage);
         } else {
             offlineText.setText(res.getString(R.string.cache_offline_not_ready));
-            offlineRefresh.setOnClickListener(refreshCacheClickListener);
-
-            offlineStore.setText(res.getString(R.string.cache_offline_store));
-            offlineStore.setClickable(true);
-            offlineStore.setOnClickListener(storeCacheClickListener);
+            if (offlineDrop != null) {
+                offlineDrop.setVisibility(View.GONE);
+            }
+            offlineStore.setText(R.string.cache_offline_store);
         }
-        offlineRefresh.setVisibility(cache.supportsRefresh() ? View.VISIBLE : View.GONE);
-        offlineRefresh.setClickable(true);
+
+    }
+
+    static void updateCacheLists(final View view, final Geocache cache, final Resources res) {
+        final Set<String> listNames = new HashSet<>();
+        for (final Integer listId : cache.getLists()) {
+            final StoredList list = DataStore.getList(listId);
+            listNames.add(list.getTitle());
+        }
+        final TextView offlineLists = ButterKnife.findById(view, R.id.offline_lists);
+        offlineLists.setText(res.getString(R.string.list_list_headline) + " " + StringUtils.join(listNames.toArray(), ", "));
     }
 
     public Geocache getCache() {
@@ -2088,13 +2292,13 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
     private static class StoreCacheHandler extends SimpleCancellableHandler {
 
-        public StoreCacheHandler(final CacheDetailActivity activity, final Progress progress) {
+        StoreCacheHandler(final CacheDetailActivity activity, final Progress progress) {
             super(activity, progress);
         }
 
         @Override
         public void handleRegularMessage(final Message msg) {
-            if (UPDATE_LOAD_PROGRESS_DETAIL == msg.what && msg.obj instanceof String) {
+            if (msg.what == UPDATE_LOAD_PROGRESS_DETAIL && msg.obj instanceof String) {
                 updateStatusMsg(R.string.cache_dialog_offline_save_message, (String) msg.obj);
             } else {
                 notifyDataSetChanged(activityRef);
@@ -2104,13 +2308,13 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
     private static final class RefreshCacheHandler extends SimpleCancellableHandler {
 
-        public RefreshCacheHandler(final CacheDetailActivity activity, final Progress progress) {
+        RefreshCacheHandler(final CacheDetailActivity activity, final Progress progress) {
             super(activity, progress);
         }
 
         @Override
         public void handleRegularMessage(final Message msg) {
-            if (UPDATE_LOAD_PROGRESS_DETAIL == msg.what && msg.obj instanceof String) {
+            if (msg.what == UPDATE_LOAD_PROGRESS_DETAIL && msg.obj instanceof String) {
                 updateStatusMsg(R.string.cache_dialog_refresh_message, (String) msg.obj);
             } else {
                 notifyDataSetChanged(activityRef);
@@ -2120,7 +2324,7 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
     private static final class ChangeNotificationHandler extends SimpleHandler {
 
-        public ChangeNotificationHandler(final CacheDetailActivity activity, final Progress progress) {
+        ChangeNotificationHandler(final CacheDetailActivity activity, final Progress progress) {
             super(activity, progress);
         }
 
@@ -2131,54 +2335,56 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
     }
 
     private static void notifyDataSetChanged(final WeakReference<AbstractActivity> activityRef) {
-        final CacheDetailActivity activity = ((CacheDetailActivity) activityRef.get());
+        final CacheDetailActivity activity = (CacheDetailActivity) activityRef.get();
         if (activity != null) {
             activity.notifyDataSetChanged();
         }
     }
 
-    protected void storeCache(final int listId, final StoreCacheHandler storeCacheHandler) {
+    protected void storeCache(final Set<Integer> listIds) {
+        final StoreCacheHandler storeCacheHandler = new StoreCacheHandler(CacheDetailActivity.this, progress);
         progress.show(this, res.getString(R.string.cache_dialog_offline_save_title), res.getString(R.string.cache_dialog_offline_save_message), true, storeCacheHandler.cancelMessage());
-        RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+        AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
             @Override
             public void call() {
-                cache.store(listId, storeCacheHandler);
+                cache.store(listIds, storeCacheHandler);
             }
         });
     }
 
     public static void editPersonalNote(final Geocache cache, final CacheDetailActivity activity) {
-        if (cache.isOffline()) {
-            final FragmentManager fm = activity.getSupportFragmentManager();
-            final EditNoteDialog dialog = EditNoteDialog.newInstance(cache.getPersonalNote());
-            dialog.show(fm, "fragment_edit_note");
-        }
+        final FragmentManager fm = activity.getSupportFragmentManager();
+        final EditNoteDialog dialog = EditNoteDialog.newInstance(cache.getPersonalNote());
+        dialog.show(fm, "fragment_edit_note");
     }
 
     @Override
     public void onFinishEditNoteDialog(final String note) {
-        final TextView personalNoteView = ButterKnife.findById(this, R.id.personalnote);
-        setPersonalNote(personalNoteView, note);
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(final Void... params) {
-                cache.setPersonalNote(note);
-                cache.parseWaypointsFromNote();
-                DataStore.saveCache(cache, EnumSet.of(SaveFlag.DB));
-                return null;
-            }
+        cache.setPersonalNote(note);
+        if (cache.parseWaypointsFromNote()) {
+            getViewCreator(Page.WAYPOINTS).notifyDataSetChanged();
+        }
 
+        final TextView personalNoteView = ButterKnife.findById(this, R.id.personalnote);
+        if (personalNoteView != null) {
+            setPersonalNote(personalNoteView, note);
+        } else {
+            reinitializeViewPager();
+        }
+
+        Schedulers.io().createWorker().schedule(new Action0() {
             @Override
-            protected void onPostExecute(final Void v) {
-                notifyDataSetChanged();
+            public void call() {
+                DataStore.saveCache(cache, EnumSet.of(SaveFlag.DB));
             }
-        }.execute();
+        });
     }
 
     private static void setPersonalNote(final TextView personalNoteView, final String personalNote) {
         personalNoteView.setText(personalNote, TextView.BufferType.SPANNABLE);
         if (StringUtils.isNotBlank(personalNote)) {
             personalNoteView.setVisibility(View.VISIBLE);
+            Linkify.addLinks(personalNoteView, Linkify.ALL);
         } else {
             personalNoteView.setVisibility(View.GONE);
         }
@@ -2196,6 +2402,10 @@ public class CacheDetailActivity extends AbstractViewPagerActivity<CacheDetailAc
 
     @Override
     public void cachesAround() {
-        CacheListActivity.startActivityCoordinates(this, cache.getCoords());
+        CacheListActivity.startActivityCoordinates(this, cache.getCoords(), cache.getName());
+    }
+
+    public void setNeedsRefresh() {
+        refreshOnResume = true;
     }
 }

@@ -9,6 +9,8 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
+import butterknife.ButterKnife;
+
 class CacheListSpinnerAdapter extends ArrayAdapter<AbstractList> {
 
     static class ViewHolder {
@@ -18,7 +20,7 @@ class CacheListSpinnerAdapter extends ArrayAdapter<AbstractList> {
 
     private final CacheListActivity cacheListActivity;
 
-    public CacheListSpinnerAdapter(final CacheListActivity context, final int resource) {
+    CacheListSpinnerAdapter(final CacheListActivity context, final int resource) {
         super(context, resource);
         cacheListActivity = context;
     }
@@ -42,12 +44,12 @@ class CacheListSpinnerAdapter extends ArrayAdapter<AbstractList> {
                 (LayoutInflater) cacheListActivity.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 
 
-        CacheListSpinnerAdapter.ViewHolder holder;
+        final CacheListSpinnerAdapter.ViewHolder holder;
         if (resultView == null) {
             resultView = inflater.inflate(R.layout.cachelist_spinneritem, parent, false);
             holder = new ViewHolder();
-            holder.title = (TextView) resultView.findViewById(android.R.id.text1);
-            holder.subtitle = (TextView) resultView.findViewById(android.R.id.text2);
+            holder.title = ButterKnife.findById(resultView, android.R.id.text1);
+            holder.subtitle = ButterKnife.findById(resultView, android.R.id.text2);
 
             resultView.setTag(holder);
         } else {

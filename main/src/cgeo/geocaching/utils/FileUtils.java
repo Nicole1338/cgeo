@@ -1,9 +1,12 @@
 package cgeo.geocaching.utils;
 
+import cgeo.geocaching.CgeoApplication;
+import cgeo.geocaching.R;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.CharEncoding;
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
 
 import android.os.Handler;
 import android.os.Message;
@@ -23,14 +26,18 @@ import java.util.List;
  */
 public final class FileUtils {
 
+    private static final int MAX_DIRECTORY_SCAN_DEPTH = 30;
     private static final String FILE_PROTOCOL = "file://";
 
     private FileUtils() {
         // utility class
     }
 
-    public static void listDir(List<File> result, File directory, FileSelector chooser, Handler feedBackHandler) {
+    public static void listDir(final List<File> result, final File directory, final FileSelector chooser, final Handler feedBackHandler) {
+        listDirInternally(result, directory, chooser, feedBackHandler, 0);
+    }
 
+    private static void listDirInternally(final List<File> result, final File directory, final FileSelector chooser, final Handler feedBackHandler, final int depths) {
         if (directory == null || !directory.isDirectory() || !directory.canRead()
                 || result == null
                 || chooser == null) {
@@ -40,7 +47,7 @@ public final class FileUtils {
         final File[] files = directory.listFiles();
 
         if (ArrayUtils.isNotEmpty(files)) {
-            for (File file : files) {
+            for (final File file : files) {
                 if (chooser.shouldEnd()) {
                     return;
                 }
@@ -57,22 +64,41 @@ public final class FileUtils {
                         continue; // skip hidden directories
                     }
                     if (name.length() > 16) {
-                        name = name.substring(0, 14) + '…';
+                        name = name.substring(0, 14) + CgeoApplication.getInstance().getString(R.string.ellipsis);
                     }
                     if (feedBackHandler != null) {
                         feedBackHandler.sendMessage(Message.obtain(feedBackHandler, 0, name));
                     }
 
-                    listDir(result, file, chooser, feedBackHandler); // go deeper
+                    if (depths < MAX_DIRECTORY_SCAN_DEPTH) {
+                        listDirInternally(result, file, chooser, feedBackHandler, depths + 1); // go deeper
+                    }
                 }
             }
         }
     }
 
-    public static abstract class FileSelector {
-        public abstract boolean isSelected(File file);
+    public static boolean deleteDirectory(@NonNull final File dir) {
+        final File[] files = dir.listFiles();
 
-        public abstract boolean shouldEnd();
+        // Although we are called on an existing directory, it might have been removed concurrently
+        // in the meantime, for example by the user or by another cleanup task.
+        if (files != null) {
+            for (final File file : files) {
+                if (file.isDirectory()) {
+                    deleteDirectory(file);
+                } else {
+                    delete(file);
+                }
+            }
+        }
+
+        return delete(dir);
+    }
+
+    public interface FileSelector {
+        boolean isSelected(File file);
+        boolean shouldEnd();
     }
 
     /**
@@ -86,18 +112,21 @@ public final class FileUtils {
      * </ul>
      * which does not yet exist.
      */
-    public static File getUniqueNamedFile(final String baseNameAndPath) {
-        String extension = StringUtils.substringAfterLast(baseNameAndPath, ".");
-        String pathName = StringUtils.substringBeforeLast(baseNameAndPath, ".");
-        int number = 1;
-        while (new File(getNumberedFileName(pathName, extension, number)).exists()) {
-            number++;
+    @NonNull
+    public static File getUniqueNamedFile(final File file) {
+        if (!file.exists()) {
+            return file;
         }
-        return new File(getNumberedFileName(pathName, extension, number));
-    }
-
-    private static String getNumberedFileName(String pathName, String extension, int number) {
-        return pathName + (number > 1 ? "_" + Integer.toString(number) : "") + "." + extension;
+        final String baseNameAndPath = file.getPath();
+        final String prefix = StringUtils.substringBeforeLast(baseNameAndPath, ".") + "_";
+        final String extension = "." + StringUtils.substringAfterLast(baseNameAndPath, ".");
+        for (int i = 2; i < Integer.MAX_VALUE; i++) {
+            final File numbered = new File(prefix + i + extension);
+            if (!numbered.exists()) {
+                return numbered;
+            }
+        }
+        throw new IllegalStateException("Unable to generate a non-existing file name");
     }
 
     /**
@@ -113,7 +142,7 @@ public final class FileUtils {
     /**
      * Deletes a file and logs deletion failures.
      *
-     * @return <code> true</code> if this file was deleted, <code>false</code> otherwise.
+     * @return {@code true} if this file was deleted, {@code false} otherwise.
      */
     public static boolean delete(final File file) {
         final boolean success = file.delete() || !file.exists();
@@ -126,10 +155,10 @@ public final class FileUtils {
     /**
      * Creates the directory named by the given file, creating any missing parent directories in the process.
      *
-     * @return <code>true</code> if the directory was created, <code>false</code> on failure or if the directory already
+     * @return {@code true} if the directory was created, {@code false} on failure or if the directory already
      *         existed.
      */
-    public static boolean mkdirs(File file) {
+    public static boolean mkdirs(final File file) {
         final boolean success = file.mkdirs() || file.isDirectory(); // mkdirs returns false on existing directories
         if (!success) {
             Log.e("Could not make directories " + file.getAbsolutePath());
@@ -137,7 +166,7 @@ public final class FileUtils {
         return success;
     }
 
-    public static boolean writeFileUTF16(File file, String content) {
+    public static boolean writeFileUTF16(final File file, final String content) {
         // TODO: replace by some apache.commons IOUtils or FileUtils code
         Writer fileWriter = null;
         BufferedOutputStream buffer = null;
@@ -171,15 +200,17 @@ public final class FileUtils {
      * @param file a local file name
      * @return an URL with the <tt>file</tt> scheme
      */
+    @NonNull
     public static String fileToUrl(final File file) {
         return FILE_PROTOCOL + file.getAbsolutePath();
     }
 
     /**
      * Local file name when {@link #isFileUrl(String)} is <tt>true</tt>.
-     * 
+     *
      * @return the local file
      */
+    @NonNull
     public static File urlToFile(final String url) {
         return new File(StringUtils.substring(url, FILE_PROTOCOL.length()));
     }

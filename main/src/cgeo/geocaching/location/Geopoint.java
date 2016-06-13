@@ -1,10 +1,11 @@
 package cgeo.geocaching.location;
 
-import cgeo.geocaching.ICoordinates;
 import cgeo.geocaching.R;
+import cgeo.geocaching.models.ICoordinates;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import android.location.Location;
 import android.os.Build;
@@ -18,7 +19,7 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Reusable default object
      */
-    public static final @NonNull Geopoint ZERO = new Geopoint(0.0, 0.0);
+    @NonNull public static final Geopoint ZERO = new Geopoint(0.0, 0.0);
 
     private static final double DEG_TO_RAD = Math.PI / 180;
     private static final double RAD_TO_DEG = 180 / Math.PI;
@@ -97,12 +98,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Create new Geopoint from individual textual components.
      *
-     * @param latDir
-     * @param latDeg
-     * @param latDegFrac
-     * @param lonDir
-     * @param lonDeg
-     * @param lonDegFrac
      */
     public Geopoint(final String latDir, final String latDeg, final String latDegFrac,
                     final String lonDir, final String lonDeg, final String lonDegFrac) {
@@ -113,14 +108,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Create new Geopoint from individual textual components.
      *
-     * @param latDir
-     * @param latDeg
-     * @param latMin
-     * @param latMinFrac
-     * @param lonDir
-     * @param lonDeg
-     * @param lonMin
-     * @param lonMinFrac
      */
     public Geopoint(final String latDir, final String latDeg, final String latMin, final String latMinFrac,
                     final String lonDir, final String lonDeg, final String lonMin, final String lonMinFrac) {
@@ -131,16 +118,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Create new Geopoint from individual textual components.
      *
-     * @param latDir
-     * @param latDeg
-     * @param latMin
-     * @param latSec
-     * @param latSecFrac
-     * @param lonDir
-     * @param lonDeg
-     * @param lonMin
-     * @param lonSec
-     * @param lonSecFrac
      */
     public Geopoint(final String latDir, final String latDeg, final String latMin, final String latSec, final String latSecFrac,
             final String lonDir, final String lonDeg, final String lonMin, final String lonSec, final String lonSecFrac) {
@@ -202,8 +179,8 @@ public final class Geopoint implements ICoordinates, Parcelable {
      * @return An array of floats: the distance in meters, then the bearing in degrees
      */
     private float[] pathTo(final Geopoint target) {
-        float[] results = new float[2];
-        android.location.Location.distanceBetween(latitude, longitude, target.latitude, target.longitude, results);
+        final float[] results = new float[2];
+        Location.distanceBetween(latitude, longitude, target.latitude, target.longitude, results);
         return results;
     }
 
@@ -283,7 +260,7 @@ public final class Geopoint implements ICoordinates, Parcelable {
      * @see GeopointFormatter
      * @return formatted coordinates
      */
-    public String format(GeopointFormatter.Format format) {
+    public String format(final GeopointFormatter.Format format) {
         return GeopointFormatter.format(format, this);
     }
 
@@ -298,10 +275,10 @@ public final class Geopoint implements ICoordinates, Parcelable {
         return format(GeopointFormatter.Format.LAT_LON_DECMINUTE);
     }
 
-    abstract public static class GeopointException extends NumberFormatException {
+    public abstract static class GeopointException extends NumberFormatException {
         private static final long serialVersionUID = 1L;
 
-        protected GeopointException(String msg) {
+        protected GeopointException(final String msg) {
             super(msg);
         }
     }
@@ -347,7 +324,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get latitude character (N or S).
      *
-     * @return
      */
     public char getLatDir() {
         return latitude >= 0 ? 'N' : 'S';
@@ -356,7 +332,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get longitude character (E or W).
      *
-     * @return
      */
     public char getLonDir() {
         return longitude >= 0 ? 'E' : 'W';
@@ -365,7 +340,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the integral non-negative latitude degrees.
      *
-     * @return
      */
     public int getLatDeg() {
         return getDeg(latitude);
@@ -374,7 +348,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the integral non-negative longitude degrees.
      *
-     * @return
      */
     public int getLonDeg() {
         return getDeg(longitude);
@@ -387,7 +360,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the fractional part of the latitude degrees scaled up by 10^5.
      *
-     * @return
      */
     public int getLatDegFrac() {
         return getDegFrac(latitude);
@@ -396,7 +368,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the fractional part of the longitude degrees scaled up by 10^5.
      *
-     * @return
      */
     public int getLonDegFrac() {
         return getDegFrac(longitude);
@@ -409,7 +380,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the integral latitude minutes.
      *
-     * @return
      */
     public int getLatMin() {
         return getMin(latitude);
@@ -418,7 +388,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the integral longitude minutes.
      *
-     * @return
      */
     public int getLonMin() {
         return getMin(longitude);
@@ -431,7 +400,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the fractional part of the latitude minutes scaled up by 1000.
      *
-     * @return
      */
     public int getLatMinFrac() {
         return getMinFrac(latitude);
@@ -440,7 +408,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the fractional part of the longitude minutes scaled up by 1000.
      *
-     * @return
      */
     public int getLonMinFrac() {
         return getMinFrac(longitude);
@@ -453,7 +420,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the latitude minutes.
      *
-     * @return
      */
     public double getLatMinRaw() {
         return getMinRaw(latitude);
@@ -462,7 +428,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the longitude minutes.
      *
-     * @return
      */
     public double getLonMinRaw() {
         return getMinRaw(longitude);
@@ -475,7 +440,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the integral part of the latitude seconds.
      *
-     * @return
      */
     public int getLatSec() {
         return getSec(latitude);
@@ -484,7 +448,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the integral part of the longitude seconds.
      *
-     * @return
      */
     public int getLonSec() {
         return getSec(longitude);
@@ -497,7 +460,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the fractional part of the latitude seconds scaled up by 1000.
      *
-     * @return
      */
 
     public int getLatSecFrac() {
@@ -507,7 +469,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the fractional part of the longitude seconds scaled up by 1000.
      *
-     * @return
      */
 
     public int getLonSecFrac() {
@@ -521,7 +482,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the latitude seconds.
      *
-     * @return
      */
     public double getLatSecRaw() {
         return getSecRaw(latitude);
@@ -530,7 +490,6 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Get the longitude seconds.
      *
-     * @return
      */
     public double getLonSecRaw() {
         return getSecRaw(longitude);
@@ -555,19 +514,19 @@ public final class Geopoint implements ICoordinates, Parcelable {
     /**
      * Gets distance in meters (workaround for 4.2.1 JIT bug).
      */
-    public static double getDistance(double lat1, double lon1, double lat2, double lon2) {
+    public static double getDistance(final double lat1, final double lon1, final double lat2, final double lon2) {
         // for haversine use R = 6372.8 km instead of 6371 km
-        double earthRadius = 6372.8;
-        double dLat = toRadians(lat2 - lat1);
-        double dLon = toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        final double earthRadius = 6372.8;
+        final double dLat = toRadians(lat2 - lat1);
+        final double dLon = toRadians(lon2 - lon1);
+        final double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
         // simplify haversine
-        return (2 * earthRadius * 1000 * Math.asin(Math.sqrt(a)));
+        return 2 * earthRadius * 1000 * Math.asin(Math.sqrt(a));
     }
 
-    private static double toRadians(double angdeg) {
+    private static double toRadians(final double angdeg) {
         return angdeg * DEG_TO_RAD;
     }
 
@@ -582,7 +541,7 @@ public final class Geopoint implements ICoordinates, Parcelable {
 
     /**
      * Check whether a longitude from user supplied data is valid. We accept both E180/W180.
-     * 
+     *
      * @return <tt>true</tt> if the longitude looks valid, <tt>false</tt> otherwise
      */
     public static boolean isValidLongitude(final double longitude) {
@@ -596,6 +555,18 @@ public final class Geopoint implements ICoordinates, Parcelable {
      */
     public boolean isValid() {
         return isValidLatitude(latitude) && isValidLongitude(longitude);
+    }
+
+    /**
+     * Check whether two geopoints represent the same latitude and longitude or are both <tt>null</tt>.
+     *
+     * @param p1 the first Geopoint, or <tt>null</tt>
+     * @param p2 the second Geopoint, or <tt>null</tt>
+     * @return <tt>true</tt> if both geopoints represent the same latitude and longitude or are both <tt>null</tt>,
+     *         <tt>false</tt> otherwise
+     */
+    public static boolean equals(@Nullable final Geopoint p1, @Nullable final Geopoint p2) {
+        return p1 == null ? p2 == null : p2 != null && p1.equals(p2);
     }
 
 }

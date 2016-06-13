@@ -9,17 +9,22 @@ import android.view.inputmethod.InputMethodManager;
 
 /**
  * Class for hiding/showing the soft keyboard on Android.
- * 
+ *
  */
 public class Keyboard {
     private final Activity activity;
 
-    public Keyboard(final @NonNull Activity activity) {
+    public Keyboard(@NonNull final Activity activity) {
         this.activity = activity;
     }
 
     public void hide() {
-        ((InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE)).toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0);
+        // Check if no view has focus:
+        final View view = activity.getCurrentFocus();
+        if (view != null) {
+            final InputMethodManager inputManager = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+            inputManager.hideSoftInputFromWindow(view.getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
+        }
     }
 
     public void show(final View view) {

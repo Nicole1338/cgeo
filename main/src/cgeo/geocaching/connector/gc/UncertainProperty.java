@@ -1,21 +1,22 @@
 package cgeo.geocaching.connector.gc;
 
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * Property with certainty. When merging properties, the one with higher certainty wins.
- * 
- * @param <T>
+ *
  */
 public class UncertainProperty<T> {
 
     private final T value;
     private final int certaintyLevel;
 
-    public UncertainProperty(T value) {
+    public UncertainProperty(final T value) {
         this(value, Tile.ZOOMLEVEL_MAX + 1);
     }
 
-    public UncertainProperty(T value, int certaintyLevel) {
+    public UncertainProperty(final T value, final int certaintyLevel) {
         this.value = value;
         this.certaintyLevel = certaintyLevel;
     }
@@ -28,25 +29,31 @@ public class UncertainProperty<T> {
         return certaintyLevel;
     }
 
-    public UncertainProperty<T> getMergedProperty(final UncertainProperty<T> other) {
-        if (null == other || null == other.value) {
+    @NonNull
+    private UncertainProperty<T> getMergedProperty(@Nullable final UncertainProperty<T> other) {
+        if (other == null || other.value == null) {
             return this;
         }
-        if (null == this.value) {
-            return other;
-        }
-        if (other.certaintyLevel > certaintyLevel) {
+        if (this.value == null || other.certaintyLevel > certaintyLevel) {
             return other;
         }
 
         return this;
     }
 
-    public static <T> UncertainProperty<T> getMergedProperty(UncertainProperty<T> property, UncertainProperty<T> otherProperty) {
-        if (null == property) {
-            return otherProperty;
+    @Nullable
+    public static <T> UncertainProperty<T> getMergedProperty(@Nullable final UncertainProperty<T> property, @Nullable final UncertainProperty<T> otherProperty) {
+        return property == null ? otherProperty : property.getMergedProperty(otherProperty);
+    }
+
+    public static <T> boolean equalValues(@Nullable final UncertainProperty<T> property, @Nullable final UncertainProperty<T> otherProperty) {
+        if (property == null || otherProperty == null) {
+            return property == null && otherProperty == null;
         }
-        return property.getMergedProperty(otherProperty);
+        if (property.value == null || otherProperty.value == null) {
+            return property.value == null && otherProperty.value == null;
+        }
+        return property.value.equals(otherProperty.value);
     }
 
 }

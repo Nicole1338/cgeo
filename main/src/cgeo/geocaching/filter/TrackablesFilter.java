@@ -1,17 +1,21 @@
 package cgeo.geocaching.filter;
 
-import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.R;
+import cgeo.geocaching.models.Geocache;
 
 import org.eclipse.jdt.annotation.NonNull;
 
-import java.util.Collections;
-import java.util.List;
+import android.os.Parcel;
+import android.os.Parcelable;
 
-class TrackablesFilter extends AbstractFilter implements IFilterFactory {
-    public TrackablesFilter() {
-        super(CgeoApplication.getInstance().getString(R.string.caches_filter_track));
+class TrackablesFilter extends AbstractFilter {
+
+    TrackablesFilter() {
+        super(R.string.caches_filter_track);
+    }
+
+    protected TrackablesFilter(final Parcel in) {
+        super(in);
     }
 
     @Override
@@ -19,10 +23,17 @@ class TrackablesFilter extends AbstractFilter implements IFilterFactory {
         return cache.hasTrackables();
     }
 
-    @Override
-    @NonNull
-    public List<TrackablesFilter> getFilters() {
-        return Collections.singletonList(this);
-    }
+    public static final Creator<TrackablesFilter> CREATOR
+            = new Parcelable.Creator<TrackablesFilter>() {
 
+        @Override
+        public TrackablesFilter createFromParcel(final Parcel in) {
+            return new TrackablesFilter(in);
+        }
+
+        @Override
+        public TrackablesFilter[] newArray(final int size) {
+            return new TrackablesFilter[size];
+        }
+    };
 }

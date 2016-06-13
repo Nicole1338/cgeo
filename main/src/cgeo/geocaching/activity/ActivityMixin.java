@@ -1,5 +1,7 @@
 package cgeo.geocaching.activity;
 
+import cgeo.geocaching.CgeoApplication;
+import cgeo.geocaching.MainActivity;
 import cgeo.geocaching.R;
 import cgeo.geocaching.settings.Settings;
 
@@ -8,14 +10,17 @@ import org.eclipse.jdt.annotation.NonNull;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
+import android.support.annotation.StringRes;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NavUtils;
 import android.support.v4.app.TaskStackBuilder;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.ActionBarActivity;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.Window;
 import android.view.WindowManager;
@@ -24,6 +29,10 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 public final class ActivityMixin {
+
+    private ActivityMixin() {
+        // utility class
+    }
 
     public static void setTitle(final Activity activity, final CharSequence text) {
         if (StringUtils.isBlank(text)) {
@@ -47,12 +56,15 @@ public final class ActivityMixin {
 
     }
 
-    public static void setTheme(final Activity activity) {
+    private static int getThemeId() {
         if (Settings.isLightSkin()) {
-            activity.setTheme(R.style.light);
-        } else {
-            activity.setTheme(R.style.dark);
+            return R.style.light;
         }
+        return R.style.dark;
+    }
+
+    public static void setTheme(final Activity activity) {
+        activity.setTheme(getThemeId());
     }
 
     public static int getDialogTheme() {
@@ -69,8 +81,14 @@ public final class ActivityMixin {
      * @param activity the activity the user is facing
      * @param resId the message
      */
-    public static void showToast(final Activity activity, final int resId) {
-        ActivityMixin.showToast(activity, activity.getString(resId));
+    public static void showToast(final Activity activity, @StringRes final int resId) {
+        showToast(activity, activity.getString(resId));
+    }
+
+    private static void showCgeoToast(final Context context, final String text, final int toastDuration) {
+        final Toast toast = Toast.makeText(context, text, toastDuration);
+        toast.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, 100);
+        toast.show();
     }
 
     private static void postShowToast(final Activity activity, final String text, final int toastDuration) {
@@ -78,12 +96,19 @@ public final class ActivityMixin {
             activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    final Toast toast = Toast.makeText(activity, text, toastDuration);
-                    toast.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, 100);
-                    toast.show();
+                    showCgeoToast(activity, text, toastDuration);
                 }
+
             });
         }
+    }
+
+    /**
+     * Show a (long) toast message in application context (e.g. from background threads)
+     */
+    public static void showApplicationToast(final String message) {
+        final Context context = new ContextThemeWrapper(CgeoApplication.getInstance().getApplicationContext(), getThemeId());
+        showCgeoToast(context, message, Toast.LENGTH_LONG);
     }
 
     /**
@@ -124,8 +149,7 @@ public final class ActivityMixin {
     public static void invalidateOptionsMenu(final Activity activity) {
         if (activity instanceof ActionBarActivity) {
             ((ActionBarActivity) activity).supportInvalidateOptionsMenu();
-        }
-        else {
+        } else {
             ActivityCompat.invalidateOptionsMenu(activity);
         }
     }
@@ -133,8 +157,6 @@ public final class ActivityMixin {
     /**
      * insert text into the EditText at the current cursor position
      *
-     * @param editText
-     * @param insertText
      * @param moveCursor
      *            place the cursor after the inserted text
      */
@@ -145,7 +167,7 @@ public final class ActivityMixin {
         final int end = Math.max(selectionStart, selectionEnd);
 
         final String content = editText.getText().toString();
-        String completeText;
+        final String completeText;
         if (start > 0 && !Character.isWhitespace(content.charAt(start - 1))) {
             completeText = " " + insertText;
         } else {
@@ -157,21 +179,17 @@ public final class ActivityMixin {
         editText.setSelection(newCursor);
     }
 
-    /**
-     * This is the exact code from Google to implement Up navigation, with one exception: activity.isTaskRoot() was
-     * added as {@link NavUtils#shouldUpRecreateTask(Activity, Intent)} seems not to handle the case, that this activity
-     * was created from an intent by another app, and our own app is not yet running. The bug seems to be fixed in
-     * Android 4.4.something, however.
-     *
-     * @param activity
-     * @return
-     */
     public static boolean navigateUp(@NonNull final Activity activity) {
-        // see http://developer.android.com/training/implementing-navigation/ancestral.html
-        final Intent upIntent = NavUtils.getParentActivityIntent(activity);
-        if (upIntent == null) {
+        // first check if there is a parent declared in the manifest
+        Intent upIntent = NavUtils.getParentActivityIntent(activity);
+        // if there is no parent, and if this was not a new task, then just go back to simulate going to a parent
+        if (upIntent == null && !activity.isTaskRoot()) {
             activity.finish();
             return true;
+        }
+        // use the main activity, if there was no back stack and no manifest based parent
+        if (upIntent == null) {
+            upIntent = new Intent(CgeoApplication.getInstance(), MainActivity.class);
         }
         if (NavUtils.shouldUpRecreateTask(activity, upIntent) || activity.isTaskRoot()) {
             // This activity is NOT part of this app's task, so create a new task
@@ -190,7 +208,7 @@ public final class ActivityMixin {
     }
 
     public static void presentShowcase(final IAbstractActivity activity) {
-        if (VERSION.SDK_INT < 11) {
+        if (VERSION.SDK_INT < 14) {
             return;
         }
         final ShowcaseViewBuilder builder = activity.getShowcase();

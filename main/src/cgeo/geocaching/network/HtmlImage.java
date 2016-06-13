@@ -4,24 +4,22 @@ import cgeo.geocaching.CgeoApplication;
 import cgeo.geocaching.R;
 import cgeo.geocaching.compatibility.Compatibility;
 import cgeo.geocaching.connector.ConnectorFactory;
-import cgeo.geocaching.files.LocalStorage;
-import cgeo.geocaching.list.StoredList;
+import cgeo.geocaching.storage.LocalStorage;
+import cgeo.geocaching.utils.AndroidRxUtils;
 import cgeo.geocaching.utils.CancellableHandler;
 import cgeo.geocaching.utils.FileUtils;
 import cgeo.geocaching.utils.ImageUtils;
 import cgeo.geocaching.utils.ImageUtils.ContainerDrawable;
 import cgeo.geocaching.utils.Log;
-import cgeo.geocaching.utils.RxUtils;
 import cgeo.geocaching.utils.RxUtils.ObservableCache;
 
-import ch.boye.httpclientandroidlib.HttpResponse;
-
+import okhttp3.Response;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
-
+import rx.Completable;
 import rx.Observable;
 import rx.Observable.OnSubscribe;
 import rx.Subscriber;
@@ -53,7 +51,7 @@ import java.util.Map;
 
 public class HtmlImage implements Html.ImageGetter {
 
-    private static final String[] BLOCKED = new String[] {
+    private static final String[] BLOCKED = {
             "gccounter.de",
             "gccounter.com",
             "cachercounter/?",
@@ -71,20 +69,20 @@ public class HtmlImage implements Html.ImageGetter {
     };
     public static final String SHARED = "shared";
 
-    @NonNull final private String geocode;
+    @NonNull private final String geocode;
     /**
      * on error: return large error image, if {@code true}, otherwise empty 1x1 image
      */
-    final private boolean returnErrorImage;
-    final private int listId;
-    final private boolean onlySave;
-    final private int maxWidth;
-    final private int maxHeight;
-    final private Resources resources;
+    private final boolean returnErrorImage;
+    private final boolean onlySave;
+    private final boolean userInitiatedRefresh;
+    private final int maxWidth;
+    private final int maxHeight;
+    private final Resources resources;
     protected final TextView view;
-    final private Map<String, BitmapDrawable> cache = new HashMap<>();
+    private final Map<String, BitmapDrawable> cache = new HashMap<>();
 
-    final private ObservableCache<String, BitmapDrawable> observableCache = new ObservableCache<>(new Func1<String, Observable<BitmapDrawable>>() {
+    private final ObservableCache<String, BitmapDrawable> observableCache = new ObservableCache<>(new Func1<String, Observable<BitmapDrawable>>() {
         @Override
         public Observable<BitmapDrawable> call(final String url) {
             return fetchDrawableUncached(url);
@@ -92,9 +90,11 @@ public class HtmlImage implements Html.ImageGetter {
     });
 
     // Background loading
-    final private PublishSubject<Observable<String>> loading = PublishSubject.create();
-    final private Observable<String> waitForEnd = Observable.merge(loading).cache();
-    final private CompositeSubscription subscription = new CompositeSubscription(waitForEnd.subscribe());
+    // .cache() is not yet available on Completable instances as of RxJava 1.1.1, so we have to go back
+    // to the observable world to achieve the caching.
+    private final PublishSubject<Completable> loading = PublishSubject.create();
+    private final Completable waitForEnd = Completable.merge(loading).toObservable().cache().toCompletable();
+    private final CompositeSubscription subscription = new CompositeSubscription(waitForEnd.subscribe());
 
     /**
      * Create a new HtmlImage object with different behaviors depending on <tt>onlySave</tt> and <tt>view</tt> values.
@@ -102,7 +102,7 @@ public class HtmlImage implements Html.ImageGetter {
      * <ul>
      * <li>If onlySave is true, {@link #getDrawable(String)} will return <tt>null</tt> immediately and will queue the
      * image retrieval and saving in the loading subject. Downloads will start in parallel when the blocking
-     * {@link #waitForEndObservable(cgeo.geocaching.utils.CancellableHandler)} method is called, and they can be
+     * {@link #waitForEndCompletable(CancellableHandler)} method is called, and they can be
      * cancelled through the given handler.</li>
      * <li>If <tt>onlySave</tt> is <tt>false</tt> and the instance is called through {@link #fetchDrawable(String)},
      * then an observable for the given URL will be returned. This observable will emit the local copy of the image if
@@ -120,23 +120,22 @@ public class HtmlImage implements Html.ImageGetter {
      * @param returnErrorImage
      *            set to <tt>true</tt> if an error image should be returned in case of a problem, <tt>false</tt> to get
      *            a transparent 1x1 image instead
-     * @param listId
-     *            the list this cache belongs to, used to determine if an older image for the offline case can be used
-     *            or not
      * @param onlySave
      *            if set to <tt>true</tt>, {@link #getDrawable(String)} will only fetch and store the image, not return
      *            it
      * @param view
      *            if non-null, {@link #getDrawable(String)} will return an initially empty drawable which will be
-     *            redrawn when
-     *            the image is ready through an invalidation of the given view
+     *            redrawn when the image is ready through an invalidation of the given view
+     * @param userInitiatedRefresh
+     *            if `true`, even fresh images will be refreshed if they have changed
      */
-    public HtmlImage(@NonNull final String geocode, final boolean returnErrorImage, final int listId, final boolean onlySave, final TextView view) {
+    public HtmlImage(@NonNull final String geocode, final boolean returnErrorImage, final boolean onlySave,
+                     final TextView view, final boolean userInitiatedRefresh) {
         this.geocode = geocode;
         this.returnErrorImage = returnErrorImage;
-        this.listId = listId;
         this.onlySave = onlySave;
         this.view = view;
+        this.userInitiatedRefresh = userInitiatedRefresh;
 
         final Point displaySize = Compatibility.getDisplaySize();
         this.maxWidth = displaySize.x - 25;
@@ -148,15 +147,16 @@ public class HtmlImage implements Html.ImageGetter {
      * Create a new HtmlImage object with different behaviors depending on <tt>onlySave</tt> value. No view object
      * will be tied to this HtmlImage.
      *
-     * For documentation, see {@link #HtmlImage(String, boolean, int, boolean, TextView)}.
+     * For documentation, see {@link #HtmlImage(String, boolean, boolean, TextView, boolean)}.
      */
-    public HtmlImage(@NonNull final String geocode, final boolean returnErrorImage, final int listId, final boolean onlySave) {
-        this(geocode, returnErrorImage, listId, onlySave, null);
+    public HtmlImage(@NonNull final String geocode, final boolean returnErrorImage, final boolean onlySave,
+                     final boolean userInitiatedRefresh) {
+        this(geocode, returnErrorImage, onlySave, null, userInitiatedRefresh);
     }
 
     /**
      * Retrieve and optionally display an image.
-     * See {@link #HtmlImage(String, boolean, int, boolean, TextView)} for the various behaviours.
+     * See {@link #HtmlImage(String, boolean, boolean, TextView, boolean)} for the various behaviours.
      *
      * @param url
      *            the URL to fetch from cache or network
@@ -170,12 +170,7 @@ public class HtmlImage implements Html.ImageGetter {
         }
         final Observable<BitmapDrawable> drawable = fetchDrawable(url);
         if (onlySave) {
-            loading.onNext(drawable.map(new Func1<BitmapDrawable, String>() {
-                @Override
-                public String call(final BitmapDrawable bitmapDrawable) {
-                    return url;
-                }
-            }));
+            loading.onNext(drawable.toCompletable());
             cache.put(url, null);
             return null;
         }
@@ -208,7 +203,7 @@ public class HtmlImage implements Html.ImageGetter {
                     final Bitmap bitmap = loadCachedImage(FileUtils.urlToFile(url), true).left;
                     return bitmap != null ? Observable.just(ImageUtils.scaleBitmapToFitDisplay(bitmap)) : Observable.<BitmapDrawable>empty();
                 }
-            }).subscribeOn(RxUtils.computationScheduler);
+            }).subscribeOn(AndroidRxUtils.computationScheduler);
         }
 
         final boolean shared = url.contains("/images/icons/icon_");
@@ -218,7 +213,7 @@ public class HtmlImage implements Html.ImageGetter {
             @Override
             public void call(final Subscriber<? super BitmapDrawable> subscriber) {
                 subscription.add(subscriber);
-                subscriber.add(RxUtils.computationScheduler.createWorker().schedule(new Action0() {
+                subscriber.add(AndroidRxUtils.computationScheduler.createWorker().schedule(new Action0() {
                     @Override
                     public void call() {
                         final ImmutablePair<BitmapDrawable, Boolean> loaded = loadFromDisk();
@@ -231,7 +226,7 @@ public class HtmlImage implements Html.ImageGetter {
                         if (bitmap != null && !onlySave) {
                             subscriber.onNext(bitmap);
                         }
-                        RxUtils.networkScheduler.createWorker().schedule(new Action0() {
+                        AndroidRxUtils.networkScheduler.createWorker().schedule(new Action0() {
                             @Override public void call() {
                                 downloadAndSave(subscriber);
                             }
@@ -264,7 +259,7 @@ public class HtmlImage implements Html.ImageGetter {
                     subscriber.onCompleted();
                     return;
                 }
-                RxUtils.computationScheduler.createWorker().schedule(new Action0() {
+                AndroidRxUtils.computationScheduler.createWorker().schedule(new Action0() {
                     @Override
                     public void call() {
                         final ImmutablePair<BitmapDrawable, Boolean> loaded = loadFromDisk();
@@ -289,7 +284,7 @@ public class HtmlImage implements Html.ImageGetter {
         return ImmutablePair.of(bitmap != null ? ImageUtils.scaleBitmapToFitDisplay(bitmap) : null, loadResult.right);
     }
 
-    public Observable<String> waitForEndObservable(@Nullable final CancellableHandler handler) {
+    public Completable waitForEndCompletable(@Nullable final CancellableHandler handler) {
         if (handler != null) {
             handler.unsubscribeIfCancelled(subscription);
         }
@@ -298,28 +293,25 @@ public class HtmlImage implements Html.ImageGetter {
     }
 
     /**
-     * Download or refresh the copy of <code>url</code> in <code>file</code>.
+     * Download or refresh the copy of {@code url} in {@code file}.
      *
      * @param url the url of the document
      * @param file the file to save the document in
-     * @return <code>true</code> if the existing file was up-to-date, <code>false</code> otherwise
+     * @return {@code true} if the existing file was up-to-date, {@code false} otherwise
      */
     private boolean downloadOrRefreshCopy(final String url, final File file) {
         final String absoluteURL = makeAbsoluteURL(url);
 
         if (absoluteURL != null) {
             try {
-                final HttpResponse httpResponse = Network.getRequest(absoluteURL, null, file);
-                if (httpResponse != null) {
-                    final int statusCode = httpResponse.getStatusLine().getStatusCode();
-                    if (statusCode == 200) {
-                        LocalStorage.saveEntityToFile(httpResponse, file);
-                    } else if (statusCode == 304) {
-                        if (!file.setLastModified(System.currentTimeMillis())) {
-                            makeFreshCopy(file);
-                        }
-                        return true;
+                final Response httpResponse = Network.getRequest(absoluteURL, null, file).toBlocking().value();
+                if (httpResponse.isSuccessful()) {
+                    LocalStorage.saveEntityToFile(httpResponse, file);
+                } else if (httpResponse.code() == 304) {
+                    if (!file.setLastModified(System.currentTimeMillis())) {
+                        makeFreshCopy(file);
                     }
+                    return true;
                 }
             } catch (final Exception e) {
                 Log.e("HtmlImage.downloadOrRefreshCopy", e);
@@ -342,8 +334,7 @@ public class HtmlImage implements Html.ImageGetter {
         if (file.renameTo(tempFile)) {
             LocalStorage.copy(tempFile, file);
             FileUtils.deleteIgnoringFailure(tempFile);
-        }
-        else {
+        } else {
             Log.e("Could not reset timestamp of file " + file.getAbsolutePath());
         }
     }
@@ -354,7 +345,7 @@ public class HtmlImage implements Html.ImageGetter {
      * @param url the image URL
      * @param pseudoGeocode the geocode or the shared name
      * @param forceKeep keep the image if it is there, without checking its freshness
-     * @return A pair whose first element is the bitmap if available, and the second one is <code>true</code> if the image is present and fresh enough.
+     * @return A pair whose first element is the bitmap if available, and the second one is {@code true} if the image is present and fresh enough.
      */
     @NonNull
     private ImmutablePair<Bitmap, Boolean> loadImageFromStorage(final String url, @NonNull final String pseudoGeocode, final boolean forceKeep) {
@@ -401,15 +392,22 @@ public class HtmlImage implements Html.ImageGetter {
      *
      * @param file the file on disk
      * @param forceKeep keep the image if it is there, without checking its freshness
-     * @return a pair with <code>true</code> in the second component if the image was there and is fresh enough or <code>false</code> otherwise,
-     *         and the image (possibly <code>null</code> if the second component is <code>false</code> and the image
-     *         could not be loaded, or if the second component is <code>true</code> and <code>onlySave</code> is also
-     *         <code>true</code>)
+     * @return a pair with {@code true} in the second component if the image was there and is fresh enough or {@code false} otherwise,
+     *         and the image (possibly {@code null} if the second component is {@code false} and the image
+     *         could not be loaded, or if the second component is {@code true} and {@code onlySave} is also
+     *         {@code true})
      */
     @NonNull
     private ImmutablePair<Bitmap, Boolean> loadCachedImage(final File file, final boolean forceKeep) {
+        // An image is considered fresh enough if the image exists and one of those conditions is true:
+        //  - forceKeep is true and the image has not been modified in the last 24 hours, to avoid reloading shared images;
+        //    with every refreshed cache;
+        //  - forceKeep is true and userInitiatedRefresh is false, as shared images are unlikely to change at all;
+        //  - userInitiatedRefresh is false and the image has not been modified in the last 24 hours.
         if (file.exists()) {
-            final boolean freshEnough = listId >= StoredList.STANDARD_LIST_ID || file.lastModified() > (System.currentTimeMillis() - (24 * 60 * 60 * 1000)) || forceKeep;
+            final boolean recentlyModified = file.lastModified() > (System.currentTimeMillis() - (24 * 60 * 60 * 1000));
+            final boolean freshEnough = (forceKeep && (recentlyModified || !userInitiatedRefresh)) ||
+                    (recentlyModified && !userInitiatedRefresh);
             if (freshEnough && onlySave) {
                 return ImmutablePair.of((Bitmap) null, true);
             }

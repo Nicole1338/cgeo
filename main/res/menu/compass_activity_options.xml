@@ -3,6 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto" >
 
     <item
+        android:id="@+id/menu_hint"
+        android:icon="@drawable/ic_menu_hint"
+        android:title="@string/cache_hint"
+        app:showAsAction="ifRoom|withText">
+    </item>
+    <item
         android:id="@+id/menu_map"
         android:icon="@drawable/ic_menu_mapmode"
         android:title="@string/caches_on_map"
@@ -27,33 +33,8 @@
         android:orderInCategory="999"
         android:title="@string/destination_select"
         android:visible="false"
+        app:actionProviderClass="cgeo.geocaching.ui.WaypointSelectionActionProvider"
         app:showAsAction="ifRoom|withText">
-        <menu>
-            <item
-                android:id="@+id/menu_compass_cache"
-                android:orderInCategory="999"
-                android:title="@string/cache"
-                android:visible="false">
-            </item>
-        </menu>
-    </item>
-    <item
-        android:id="@+id/menu_compass_sensor"
-        android:icon="@drawable/ic_menu_compass"
-        android:title="@string/compass_sensors"
-        app:showAsAction="never|withText"> <!-- will be replaced in code -->
-        <menu>
-            <group android:checkableBehavior="single" >
-                <item
-                    android:id="@+id/menu_compass_sensor_gps"
-                    android:title="@string/use_gps">
-                </item>
-                <item
-                    android:id="@+id/menu_compass_sensor_magnetic"
-                    android:title="@string/use_compass">
-                </item>
-            </group>
-        </menu>
     </item>
 
 </menu>

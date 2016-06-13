@@ -3,13 +3,13 @@ package cgeo.geocaching.maps.mapsforge;
 import cgeo.geocaching.location.Geopoint;
 import cgeo.geocaching.maps.interfaces.GeoPointImpl;
 
-import org.mapsforge.core.GeoPoint;
+import org.mapsforge.v3.core.GeoPoint;
 
 public class MapsforgeGeoPoint extends GeoPoint implements GeoPointImpl {
 
     private static final long serialVersionUID = 1L;
 
-    public MapsforgeGeoPoint(int latitudeE6, int longitudeE6) {
+    public MapsforgeGeoPoint(final int latitudeE6, final int longitudeE6) {
         super(latitudeE6, longitudeE6);
     }
 

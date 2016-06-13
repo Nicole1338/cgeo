@@ -1,25 +1,24 @@
 package cgeo.geocaching.location;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import android.annotation.SuppressLint;
 
-import cgeo.geocaching.ICoordinates;
-import cgeo.geocaching.location.Geopoint;
-import cgeo.geocaching.location.Viewport;
+import junit.framework.TestCase;
 
 import org.eclipse.jdt.annotation.NonNull;
-
-import android.annotation.SuppressLint;
-import android.test.AndroidTestCase;
 
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-public class ViewportTest extends AndroidTestCase {
+import cgeo.geocaching.models.ICoordinates;
 
-    final private static @NonNull
-    Viewport vpRef = new Viewport(new Geopoint(-1.0, -2.0), new Geopoint(3.0, 4.0));
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class ViewportTest extends TestCase {
+
+    @NonNull
+    private static final Viewport vpRef = new Viewport(new Geopoint(-1.0, -2.0), new Geopoint(3.0, 4.0));
 
     public static void assertBounds(final Viewport vp) {
         assertEquals(new Geopoint(1.0, 1.0), vp.center);
@@ -97,7 +96,7 @@ public class ViewportTest extends AndroidTestCase {
 
     public static void testContaining() {
         assertThat(Viewport.containing(Collections.singleton((ICoordinates) null))).isNull();
-        final Set<Geopoint> points = new HashSet<Geopoint>();
+        final Set<Geopoint> points = new HashSet<>();
         points.add(vpRef.bottomLeft);
         assertEquals(new Viewport(vpRef.bottomLeft, vpRef.bottomLeft), Viewport.containing(points));
         points.add(vpRef.topRight);

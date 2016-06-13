@@ -58,7 +58,8 @@
                 android:textColor="?text_color"
                 android:textColorLink="?text_color_link"
                 android:textIsSelectable="false"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                tools:text="attribute 1\nattribute 2\nattribute 3"/>
         </LinearLayout>
 
         <!-- Offline box -->
@@ -83,61 +84,74 @@
                     android:layout_width="fill_parent"
                     android:layout_height="wrap_content"
                     android:layout_alignParentLeft="true"
+                    android:layout_toLeftOf="@+id/offline_buttons"
                     android:layout_centerVertical="true"
                     android:layout_gravity="left"
                     android:layout_marginLeft="6dip"
-                    android:layout_marginRight="130dip"
+                    android:layout_marginRight="6dip"
                     android:paddingRight="3dip"
                     android:textColor="?text_color"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="This cache has not been stored. Or has it? Maybe an hour ago?"
+                    android:textIsSelectable="false" />
 
-                <Button
-                    android:id="@+id/offline_refresh"
-                    style="@style/button_small"
-                    android:layout_width="60dip"
-                    android:layout_alignParentRight="true"
-                    android:layout_marginRight="71dip"
-                    android:text="@string/cache_offline_refresh"
-                    android:visibility="gone" />
+                <LinearLayout
+                    android:id="@+id/offline_buttons"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true" >
 
+                    <Button
+                        android:id="@+id/offline_refresh"
+                        style="@style/button_small"
+                        android:layout_width="wrap_content"
+                        android:minWidth="60dip"
+                        android:text="@string/cache_offline_refresh"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/offline_drop"
+                        style="@style/button_small"
+                        android:layout_width="wrap_content"
+                        android:layout_marginLeft="2dip"
+                        android:minWidth="60dip"
+                        android:text="@string/cache_offline_drop" />
+
+                </LinearLayout>
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/offline_lists"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="left"
+                    android:layout_alignParentLeft="true"
+                    android:layout_toLeftOf="@+id/offline_store"
+                    android:layout_marginLeft="6dip"
+                    android:layout_marginRight="6dip"
+                    android:paddingRight="3dip"
+                    android:textColor="?text_color"
+                    android:textSize="14sp"
+                    tools:text="list 1, list 2, list 3, and many, many, many, many, many more lists"
+                    android:textIsSelectable="false" />
                 <Button
                     android:id="@+id/offline_store"
                     style="@style/button_small"
-                    android:layout_width="60dip"
                     android:layout_alignParentRight="true"
+                    android:layout_width="wrap_content"
+                    android:layout_marginLeft="2dip"
+                    android:layout_gravity="right"
+                    android:minWidth="60dip"
                     android:text="@string/cache_offline_store" />
+
             </RelativeLayout>
+
         </LinearLayout>
-
-        <!-- list box -->
-
-        <RelativeLayout
-            android:id="@+id/list_box"
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone" >
-
-            <TextView
-                android:id="@+id/list_text"
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:layout_alignParentLeft="true"
-                android:layout_centerVertical="true"
-                android:layout_gravity="left"
-                android:layout_marginLeft="6dip"
-                android:layout_marginRight="130dip"
-                android:paddingRight="3dip"
-                android:textColor="?text_color"
-                android:textSize="14sp" />
-
-            <Button
-                android:id="@+id/change_list"
-                style="@style/button_small"
-                android:layout_alignParentRight="true"
-                android:text="@string/cache_list_change"
-                android:visibility="visible" />
-        </RelativeLayout>
 
         <!-- Watchlist box -->
 
@@ -167,14 +181,17 @@
                     android:layout_marginRight="130dip"
                     android:paddingRight="3dip"
                     android:textColor="?text_color"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="The cache may or may not be on your watch list."
+                    android:textIsSelectable="false" />
 
                 <Button
                     android:id="@+id/add_to_watchlist"
                     style="@style/button_small"
                     android:layout_alignParentRight="true"
                     android:text="@string/cache_watchlist_add"
-                    android:visibility="gone" />
+                    android:visibility="gone"
+                    tools:visibility="visible"/>
 
                 <Button
                     android:id="@+id/remove_from_watchlist"
@@ -213,14 +230,17 @@
                     android:layout_marginRight="130dip"
                     android:paddingRight="3dip"
                     android:textColor="?text_color"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    tools:text="Probably not on your favorite list. You may have some fav points remaining."
+                    android:textIsSelectable="false" />
 
                 <Button
                     android:id="@+id/add_to_favpoint"
                     style="@style/button_small"
                     android:layout_alignParentRight="true"
                     android:text="@string/cache_favpoint_add"
-                    android:visibility="gone" />
+                    android:visibility="gone"
+                    tools:visibility="visible"/>
 
                 <Button
                     android:id="@+id/remove_from_favpoint"
@@ -238,7 +258,8 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:visibility="gone" >
+            android:visibility="gone"
+            tools:visibility="visible">
 
             <RelativeLayout style="@style/separator_horizontal_layout" >
 
@@ -258,7 +279,8 @@
                 android:padding="3dip"
                 android:textColor="?text_color"
                 android:textColorLink="?text_color_link"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                tools:text="some license text"/>
         </LinearLayout>
 
         <!-- Map Preview Box -->
@@ -268,7 +290,8 @@
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:visibility="gone" >
+            android:visibility="gone"
+            tools:visibility="visible">
 
             <View
                 style="@style/separator_horizontal"
@@ -283,7 +306,8 @@
                 android:gravity="center"
                 android:onClick="showNavigationMenu"
                 android:scaleType="fitCenter"
-                android:src="@null" />
+                android:src="@null"
+                tools:src="@drawable/ic_menu_mapmode"/>
         </LinearLayout>
     </LinearLayout>
 

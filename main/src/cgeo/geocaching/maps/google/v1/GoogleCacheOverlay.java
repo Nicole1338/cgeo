@@ -8,6 +8,8 @@ import cgeo.geocaching.maps.interfaces.MapViewImpl;
 import com.google.android.maps.ItemizedOverlay;
 import com.google.android.maps.MapView;
 
+import org.eclipse.jdt.annotation.Nullable;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Point;
@@ -21,10 +23,14 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class GoogleCacheOverlay extends ItemizedOverlay<GoogleCacheOverlayItem> implements ItemizedOverlayImpl {
 
-    private CachesOverlay base;
-    private Lock lock = new ReentrantLock();
+    /**
+     * The super constructor already invokes methods accessing this member before it is initialized. Therefore it can be
+     * null, although it is assigned in the constructor. Don't trust static code analysis here.
+     */
+    @Nullable private final CachesOverlay base;
+    private final Lock lock = new ReentrantLock();
 
-    public GoogleCacheOverlay(Context contextIn, Drawable markerIn) {
+    public GoogleCacheOverlay(final Context contextIn, final Drawable markerIn) {
         super(boundCenterBottom(markerIn));
         base = new CachesOverlay(this, contextIn);
     }
@@ -35,39 +41,37 @@ public class GoogleCacheOverlay extends ItemizedOverlay<GoogleCacheOverlayItem> 
     }
 
     @Override
-    protected GoogleCacheOverlayItem createItem(int i) {
-        if (base == null) {
-            return null;
+    protected GoogleCacheOverlayItem createItem(final int i) {
+        if (base != null) {
+            return (GoogleCacheOverlayItem) base.createItem(i);
         }
-
-        return (GoogleCacheOverlayItem) base.createItem(i);
+        return null;
     }
 
     @Override
     public int size() {
-        if (base == null) {
-            return 0;
+        if (base != null) {
+            return base.size();
         }
-
-        return base.size();
+        return 0;
     }
 
     @Override
-    protected boolean onTap(int arg0) {
-        if (base == null) {
-            return false;
+    protected boolean onTap(final int arg0) {
+        if (base != null) {
+            return base.onTap(arg0);
         }
-
-        return base.onTap(arg0);
+        return false;
     }
 
     @Override
-    public void draw(Canvas canvas, MapView mapView, boolean shadow) {
-        base.draw(canvas, castMapViewImpl(mapView), shadow);
+    public void draw(final Canvas canvas, final MapView mapView, final boolean shadow) {
+        if (base != null) {
+            base.draw(canvas, castMapViewImpl(mapView), shadow);
+        }
     }
 
-    private static MapViewImpl castMapViewImpl(MapView mapView) {
-        assert mapView instanceof MapViewImpl;
+    private static MapViewImpl castMapViewImpl(final MapView mapView) {
         return (MapViewImpl) mapView;
     }
 
@@ -77,28 +81,28 @@ public class GoogleCacheOverlay extends ItemizedOverlay<GoogleCacheOverlayItem> 
     }
 
     @Override
-    public Drawable superBoundCenterBottom(Drawable marker) {
+    public Drawable superBoundCenterBottom(final Drawable marker) {
         return ItemizedOverlay.boundCenterBottom(marker);
     }
 
     @Override
-    public void superSetLastFocusedItemIndex(int i) {
+    public void superSetLastFocusedItemIndex(final int i) {
         super.setLastFocusedIndex(i);
     }
 
     @Override
-    public boolean superOnTap(int index) {
+    public boolean superOnTap(final int index) {
         return super.onTap(index);
     }
 
     @Override
-    public void superDraw(Canvas canvas, MapViewImpl mapView, boolean shadow) {
+    public void superDraw(final Canvas canvas, final MapViewImpl mapView, final boolean shadow) {
         super.draw(canvas, (MapView) mapView, shadow);
     }
 
     @Override
-    public void superDrawOverlayBitmap(Canvas canvas, Point drawPosition,
-            MapProjectionImpl projection, byte drawZoomLevel) {
+    public void superDrawOverlayBitmap(final Canvas canvas, final Point drawPosition,
+            final MapProjectionImpl projection, final byte drawZoomLevel) {
         // Nothing to do here...
     }
 

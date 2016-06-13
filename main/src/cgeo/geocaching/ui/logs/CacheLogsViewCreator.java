@@ -2,8 +2,9 @@ package cgeo.geocaching.ui.logs;
 
 import cgeo.geocaching.CacheDetailActivity;
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
-import cgeo.geocaching.LogEntry;
+import cgeo.geocaching.storage.DataStore;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.LogEntry;
 import cgeo.geocaching.R;
 import cgeo.geocaching.enumerations.LogType;
 import cgeo.geocaching.ui.UserActionsClickListener;
@@ -24,28 +25,32 @@ import java.util.Map.Entry;
 public class CacheLogsViewCreator extends LogsViewCreator {
     private final boolean allLogs;
     private final Resources res = CgeoApplication.getInstance().getResources();
+    private final CacheDetailActivity cacheDetailActivity;
 
-    public CacheLogsViewCreator(CacheDetailActivity cacheDetailActivity, boolean allLogs) {
+    public CacheLogsViewCreator(final CacheDetailActivity cacheDetailActivity, final boolean allLogs) {
         super(cacheDetailActivity);
+        this.cacheDetailActivity = cacheDetailActivity;
         this.allLogs = allLogs;
     }
 
-    /**
-     * May return null!
-     *
-     * @return
-     */
     private Geocache getCache() {
-        if (this.activity instanceof CacheDetailActivity) {
-            CacheDetailActivity details = (CacheDetailActivity) this.activity;
-            return details.getCache();
-        }
-        return null;
+        return cacheDetailActivity.getCache();
     }
 
     @Override
     protected List<LogEntry> getLogs() {
-        return allLogs ? getCache().getLogs() : getCache().getFriendsLogs();
+        final Geocache cache = getCache();
+        final List<LogEntry> logs = allLogs ? cache.getLogs() : cache.getFriendsLogs();
+        return addOwnOfflineLog(cache, logs);
+    }
+
+    private List<LogEntry> addOwnOfflineLog(final Geocache cache, final List<LogEntry> logsIn) {
+        final LogEntry log = DataStore.loadLogOffline(cache.getGeocode());
+        final List<LogEntry> logs = new ArrayList<>(logsIn);
+        if (log != null) {
+            logs.add(0, log.buildUpon().setAuthor(res.getString(R.string.log_your_saved_log)).build());
+        }
+        return logs;
     }
 
     @Override
@@ -56,7 +61,7 @@ public class CacheLogsViewCreator extends LogsViewCreator {
             final List<Entry<LogType, Integer>> sortedLogCounts = new ArrayList<>(logCounts.size());
             for (final Entry<LogType, Integer> entry : logCounts.entrySet()) {
                 // it may happen that the label is unknown -> then avoid any output for this type
-                if (entry.getKey() != LogType.PUBLISH_LISTING && entry.getKey().getL10n() != null && entry.getValue() != 0) {
+                if (entry.getKey() != LogType.PUBLISH_LISTING && entry.getValue() != 0) {
                     sortedLogCounts.add(entry);
                 }
             }
@@ -66,12 +71,12 @@ public class CacheLogsViewCreator extends LogsViewCreator {
                 Collections.sort(sortedLogCounts, new Comparator<Entry<LogType, Integer>>() {
 
                     @Override
-                    public int compare(Entry<LogType, Integer> logCountItem1, Entry<LogType, Integer> logCountItem2) {
+                    public int compare(final Entry<LogType, Integer> logCountItem1, final Entry<LogType, Integer> logCountItem2) {
                         return logCountItem1.getKey().compareTo(logCountItem2.getKey());
                     }
                 });
 
-                final ArrayList<String> labels = new ArrayList<>(sortedLogCounts.size());
+                final List<String> labels = new ArrayList<>(sortedLogCounts.size());
                 for (final Entry<LogType, Integer> pair : sortedLogCounts) {
                     labels.add(pair.getValue() + "× " + pair.getKey().getL10n());
                 }
@@ -84,7 +89,7 @@ public class CacheLogsViewCreator extends LogsViewCreator {
     }
 
     @Override
-    protected void fillCountOrLocation(LogViewHolder holder, final LogEntry log) {
+    protected void fillCountOrLocation(final LogViewHolder holder, final LogEntry log) {
         // finds count
         if (log.found == -1) {
             holder.countOrLocation.setVisibility(View.GONE);
@@ -92,6 +97,21 @@ public class CacheLogsViewCreator extends LogsViewCreator {
             holder.countOrLocation.setVisibility(View.VISIBLE);
             holder.countOrLocation.setText(res.getQuantityString(R.plurals.cache_counts, log.found, log.found));
         }
+    }
+
+    @Override
+    protected void fillViewHolder(final View convertView, final LogViewHolder holder, final LogEntry log) {
+        super.fillViewHolder(convertView, holder, log);
+        if (isOfflineLog(log)) {
+            holder.author.setOnClickListener(new EditOfflineLogListener(getCache(), cacheDetailActivity));
+            holder.text.setOnClickListener(new EditOfflineLogListener(getCache(), cacheDetailActivity));
+            holder.marker.setVisibility(View.VISIBLE);
+            holder.marker.setImageResource(R.drawable.mark_orange);
+        }
+    }
+
+    private boolean isOfflineLog(final LogEntry log) {
+        return log.author.equals(activity.getString(R.string.log_your_saved_log));
     }
 
     @Override

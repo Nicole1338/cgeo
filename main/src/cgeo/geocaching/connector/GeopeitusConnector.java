@@ -1,6 +1,6 @@
 package cgeo.geocaching.connector;
 
-import cgeo.geocaching.Geocache;
+import cgeo.geocaching.models.Geocache;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
@@ -15,7 +15,7 @@ class GeopeitusConnector extends AbstractConnector {
 
     @Override
     @NonNull
-    public String getCacheUrl(final @NonNull Geocache cache) {
+    public String getCacheUrl(@NonNull final Geocache cache) {
         return getCacheUrlPrefix() + StringUtils.stripStart(cache.getGeocode().substring(2), "0");
     }
 

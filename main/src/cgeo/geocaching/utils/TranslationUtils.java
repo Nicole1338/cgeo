@@ -20,7 +20,7 @@ public final class TranslationUtils {
     private static final String TRANSLATION_AUTO_SELECT = "#auto";
     private static final String TRANSLATION_FIELD_SEPARATOR = "|";
 
-    public static final int TRANSLATION_TEXT_LENGTH_WARN = 500;
+    private static final int TRANSLATION_TEXT_LENGTH_WARN = 500;
     private static final String TRANSLATION_APP = "com.google.android.apps.translate";
 
     private TranslationUtils() {
@@ -29,7 +29,7 @@ public final class TranslationUtils {
 
     /**
      * Build a URI for Google Translate.
-     * 
+     *
      * @param toLang
      *            The two-letter lowercase ISO language codes as defined by ISO 639-1
      * @param text
@@ -56,7 +56,7 @@ public final class TranslationUtils {
      *            The text to be translated
      */
     public static void startActivityTranslate(final Activity activity, final String toLang, final String text) {
-        if (text.length() > TranslationUtils.TRANSLATION_TEXT_LENGTH_WARN) {
+        if (text.length() > TRANSLATION_TEXT_LENGTH_WARN) {
             ActivityMixin.showToast(activity, R.string.translate_length_warning);
         }
         activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(buildTranslationURI(toLang, text))));

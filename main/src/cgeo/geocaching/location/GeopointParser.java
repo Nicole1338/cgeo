@@ -2,6 +2,7 @@ package cgeo.geocaching.location;
 
 import cgeo.geocaching.utils.MatcherWrapper;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 
@@ -12,21 +13,25 @@ import java.util.regex.Pattern;
  */
 class GeopointParser {
 
+    private GeopointParser() {
+        // utility class
+    }
+
     private static class ResultWrapper {
         final double result;
         final int matcherPos;
         final int matcherLength;
 
-        public ResultWrapper(final double result, final int matcherPos, final int stringLength) {
+        ResultWrapper(final double result, final int matcherPos, final int stringLength) {
             this.result = result;
             this.matcherPos = matcherPos;
             this.matcherLength = stringLength;
         }
     }
 
-    //                                                            ( 1  )       ( 2  )         ( 3  )       ( 4  )       (        5        )
-    private static final Pattern PATTERN_LAT = Pattern.compile("\\b([NS]|)\\s*(\\d+°?|°)(?:\\s*(\\d+)(?:[.,](\\d+)|'?\\s*(\\d+(?:[.,]\\d+)?)(?:''|\")?)?)?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_LON = Pattern.compile("\\b([WE]|)\\s*(\\d+°?|°)(?:\\s*(\\d+)(?:[.,](\\d+)|'?\\s*(\\d+(?:[.,]\\d+)?)(?:''|\")?)?)?", Pattern.CASE_INSENSITIVE);
+    //                                                             (  1  )    (   2    )       ( 3  )       ( 4  )             (        5        )
+    private static final Pattern PATTERN_LAT = Pattern.compile("\\b([NS]|)\\s*(\\d+°?|°)(?:\\s*(\\d+)(?:[.,](\\d+)|(?:'|′)?\\s*(\\d+(?:[.,]\\d+)?)(?:''|\"|″)?)?)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_LON = Pattern.compile("\\b([WE]|)\\s*(\\d+°?|°)(?:\\s*(\\d+)(?:[.,](\\d+)|(?:'|′)?\\s*(\\d+(?:[.,]\\d+)?)(?:''|\"|″)?)?)?", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern PATTERN_BAD_BLANK = Pattern.compile("(\\d)[,.] (\\d{2,})");
 
@@ -56,6 +61,19 @@ class GeopointParser {
      *             if lat or lon could not be parsed
      */
     public static Geopoint parse(@NonNull final String text) {
+        // first try if these are simply 2 double values
+        try {
+            final String[] parts = StringUtils.split(StringUtils.trim(text));
+            if (parts.length == 2) {
+                // strip space, tab and &nbsp;
+                final double lat = Double.parseDouble(StringUtils.strip(parts[0], " \t\u00a0"));
+                final double lon = Double.parseDouble(StringUtils.strip(parts[1], " \t\u00a0"));
+                return new Geopoint(lat, lon);
+            }
+        } catch (final NumberFormatException e) {
+            // ignore and continue parsing textual formats
+        }
+
         final ResultWrapper latitudeWrapper = parseHelper(text, LatLon.LAT);
         // cut away the latitude part when parsing the longitude
         final ResultWrapper longitudeWrapper = parseHelper(text.substring(latitudeWrapper.matcherPos + latitudeWrapper.matcherLength), LatLon.LON);
@@ -77,21 +95,18 @@ class GeopointParser {
 
     /**
      * Helper for coordinates-parsing
-     * 
+     *
      * @param text the text to parse
      * @param latlon the kind of coordinate to parse
      * @return a wrapper with the result and the corresponding matching part
      * @throws Geopoint.ParseException if the text cannot be parsed
      */
     private static ResultWrapper parseHelper(@NonNull final String text, final LatLon latlon) {
-        MatcherWrapper matcher = new MatcherWrapper(PATTERN_BAD_BLANK, text);
-        final String replaceSpaceAfterComma = matcher.replaceAll("$1.$2");
-
-        final Pattern pattern = LatLon.LAT == latlon ? PATTERN_LAT : PATTERN_LON;
-        matcher = new MatcherWrapper(pattern, replaceSpaceAfterComma);
+        final String replaceSpaceAfterComma = new MatcherWrapper(PATTERN_BAD_BLANK, text).replaceAll("$1.$2");
+        final MatcherWrapper matcher = new MatcherWrapper(latlon == LatLon.LAT ? PATTERN_LAT : PATTERN_LON, replaceSpaceAfterComma);
 
         try {
-            return new ResultWrapper(Double.valueOf(replaceSpaceAfterComma), 0, text.length());
+            return new ResultWrapper(Double.parseDouble(replaceSpaceAfterComma), 0, text.length());
         } catch (final NumberFormatException ignored) {
             // fall through to advanced parsing
         }
@@ -99,17 +114,17 @@ class GeopointParser {
         try {
             if (matcher.find()) {
                 final double sign = matcher.group(1).equalsIgnoreCase("S") || matcher.group(1).equalsIgnoreCase("W") ? -1.0 : 1.0;
-                final double degree = Integer.valueOf(StringUtils.defaultIfEmpty(StringUtils.stripEnd(matcher.group(2), "°"), "0")).doubleValue();
+                final double degree = Double.parseDouble(StringUtils.defaultIfEmpty(StringUtils.stripEnd(matcher.group(2), "°"), "0"));
 
                 double minutes = 0.0;
                 double seconds = 0.0;
 
-                if (null != matcher.group(3)) {
-                    minutes = Integer.valueOf(matcher.group(3)).doubleValue();
+                if (matcher.group(3) != null) {
+                    minutes = Double.parseDouble(matcher.group(3));
 
-                    if (null != matcher.group(4)) {
+                    if (matcher.group(4) != null) {
                         seconds = Double.parseDouble("0." + matcher.group(4)) * 60.0;
-                    } else if (null != matcher.group(5)) {
+                    } else if (matcher.group(5) != null) {
                         seconds = Double.parseDouble(matcher.group(5).replace(",", "."));
                     }
                 }
@@ -123,10 +138,11 @@ class GeopointParser {
         // Nothing found with "N 52...", try to match string as decimal degree parts (i.e. multiple doubles)
         try {
             final String[] items = StringUtils.split(StringUtils.trimToEmpty(text));
-            if (items.length > 0 && items.length <= 2) {
-                final int index = (latlon == LatLon.LON ? items.length - 1 : 0);
+            final int length = ArrayUtils.getLength(items);
+            if (length > 0 && length <= 2) {
+                final int index = latlon == LatLon.LON ? length - 1 : 0;
                 final String textPart = items[index];
-                final int pos = (latlon == LatLon.LON ? text.lastIndexOf(textPart) : text.indexOf(textPart));
+                final int pos = latlon == LatLon.LON ? text.lastIndexOf(textPart) : text.indexOf(textPart);
                 return new ResultWrapper(Double.parseDouble(textPart), pos, textPart.length());
             }
         } catch (final NumberFormatException ignored) {

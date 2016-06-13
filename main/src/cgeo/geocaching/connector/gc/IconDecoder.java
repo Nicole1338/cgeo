@@ -1,6 +1,6 @@
 package cgeo.geocaching.connector.gc;
 
-import cgeo.geocaching.Geocache;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.settings.Settings;
 
@@ -10,7 +10,7 @@ import android.graphics.Bitmap;
  * icon decoder for cache icons
  *
  */
-abstract class IconDecoder {
+final class IconDecoder {
     private static final int CT_TRADITIONAL = 0;
     private static final int CT_MULTI = 1;
     private static final int CT_MYSTERY = 2;
@@ -24,6 +24,10 @@ abstract class IconDecoder {
     private static final int CT_WHERIGO = 10;
     private static final int CT_VIRTUAL = 11;
     private static final int CT_LETTERBOX = 12;
+
+    private IconDecoder() {
+        throw new IllegalStateException("utility class");
+    }
 
     static boolean parseMapPNG(final Geocache cache, final Bitmap bitmap, final UTFGridPosition xy, final int zoomlevel) {
         final int topX = xy.getX() * 4;
@@ -60,15 +64,13 @@ abstract class IconDecoder {
                     continue;
                 }
 
-                int type;
+                final int type;
                 if (zoomlevel < 12) {
                     type = getCacheTypeFromPixel11(r, g, b);
+                } else if (zoomlevel > 13) {
+                    type = getCacheTypeFromPixel14(r, g, b);
                 } else {
-                    if (zoomlevel > 13) {
-                        type = getCacheTypeFromPixel14(r, g, b);
-                    } else {
-                        type = getCacheTypeFromPixel13(r, g, b);
-                    }
+                    type = getCacheTypeFromPixel13(r, g, b);
                 }
                 pngType[type]++;
             }
@@ -105,7 +107,7 @@ abstract class IconDecoder {
                     cache.setFound(true);
                     return true;
                 case CT_OWN:
-                    cache.setOwnerUserId(Settings.getUsername());
+                    cache.setOwnerUserId(Settings.getUserName());
                     return true;
                 case CT_MEGAEVENT:
                     cache.setType(CacheType.MEGA_EVENT, zoomlevel);
@@ -131,7 +133,7 @@ abstract class IconDecoder {
     }
 
     /**
-     * A method that returns true if pixel color appears on more then one cache type and shall be excluded from parsing
+     * A method that returns true if pixel color appears on more than one cache type and shall be excluded from parsing
      *
      * @param r
      *            red value

@@ -1,6 +1,5 @@
 package cgeo.geocaching.ui.dialog;
 
-import cgeo.geocaching.CgeoApplication;
 import cgeo.geocaching.R;
 import cgeo.geocaching.settings.Settings;
 
@@ -15,14 +14,19 @@ import android.view.View;
 
 public class LiveMapInfoDialogBuilder {
 
-    public static AlertDialog create(Activity activity) {
+    private LiveMapInfoDialogBuilder() {
+        // utility class
+    }
+
+    public static AlertDialog create(final Activity activity) {
         final AlertDialog.Builder builder = new AlertDialog.Builder(activity);
 
         final Context themedContext;
-        if (Settings.isLightSkin() && VERSION.SDK_INT < VERSION_CODES.HONEYCOMB)
+        if (Settings.isLightSkin() && VERSION.SDK_INT < VERSION_CODES.HONEYCOMB) {
             themedContext = new ContextThemeWrapper(activity, R.style.dark);
-        else
+        } else {
             themedContext = activity;
+        }
         final View layout = View.inflate(themedContext, R.layout.livemapinfo, null);
         builder.setView(layout);
 
@@ -32,9 +36,8 @@ public class LiveMapInfoDialogBuilder {
         builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
 
             @Override
-            public void onClick(DialogInterface dialog, int which) {
+            public void onClick(final DialogInterface dialog, final int which) {
                 dialog.dismiss();
-                CgeoApplication.getInstance().setLiveMapHintShownInThisSession();
             }
         });
         return builder.create();

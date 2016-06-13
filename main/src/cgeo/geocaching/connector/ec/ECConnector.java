@@ -1,11 +1,10 @@
 package cgeo.geocaching.connector.ec;
 
-import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.LogCacheActivity;
 import cgeo.geocaching.R;
 import cgeo.geocaching.SearchResult;
 import cgeo.geocaching.connector.AbstractConnector;
+import cgeo.geocaching.connector.ConnectorFactory;
 import cgeo.geocaching.connector.ILoggingManager;
 import cgeo.geocaching.connector.capability.ICredentials;
 import cgeo.geocaching.connector.capability.ILogin;
@@ -18,6 +17,8 @@ import cgeo.geocaching.enumerations.StatusCode;
 import cgeo.geocaching.loaders.RecaptchaReceiver;
 import cgeo.geocaching.location.Geopoint;
 import cgeo.geocaching.location.Viewport;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.settings.Credentials;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.settings.SettingsActivity;
 import cgeo.geocaching.utils.CancellableHandler;
@@ -43,9 +44,7 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
      * Pattern for EC codes
      */
     @NonNull
-    private final static Pattern PATTERN_EC_CODE = Pattern.compile("EC[0-9]+", Pattern.CASE_INSENSITIVE);
-
-    private final CgeoApplication app = CgeoApplication.getInstance();
+    private static final Pattern PATTERN_EC_CODE = Pattern.compile("EC[0-9]+", Pattern.CASE_INSENSITIVE);
 
     @NonNull
     private final ECLogin ecLogin = ECLogin.getInstance();
@@ -58,7 +57,7 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
      * initialization on demand holder pattern
      */
     private static class Holder {
-        private static final @NonNull ECConnector INSTANCE = new ECConnector();
+        @NonNull private static final ECConnector INSTANCE = new ECConnector();
     }
 
     @NonNull
@@ -68,7 +67,7 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
 
     @Override
     public boolean canHandle(@NonNull final String geocode) {
-        return ECConnector.PATTERN_EC_CODE.matcher(geocode).matches();
+        return PATTERN_EC_CODE.matcher(geocode).matches();
     }
 
     @Override
@@ -90,7 +89,7 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
     }
 
     @Override
-    public SearchResult searchByGeocode(final @Nullable String geocode, final @Nullable String guid, final CancellableHandler handler) {
+    public SearchResult searchByGeocode(@Nullable final String geocode, @Nullable final String guid, final CancellableHandler handler) {
         if (geocode == null) {
             return null;
         }
@@ -103,18 +102,18 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
 
     @Override
     @NonNull
-    public SearchResult searchByViewport(@NonNull final Viewport viewport, @NonNull final MapTokens tokens) {
+    public SearchResult searchByViewport(@NonNull final Viewport viewport, @Nullable final MapTokens tokens) {
         final Collection<Geocache> caches = ECApi.searchByBBox(viewport);
         final SearchResult searchResult = new SearchResult(caches);
-        return searchResult.filterSearchResults(false, false, Settings.getCacheType());
+        return searchResult.filterSearchResults(false, Settings.getCacheType());
     }
 
     @Override
     @NonNull
-    public SearchResult searchByCenter(@NonNull final Geopoint center, final @NonNull RecaptchaReceiver recaptchaReceiver) {
+    public SearchResult searchByCenter(@NonNull final Geopoint center, @NonNull final RecaptchaReceiver recaptchaReceiver) {
         final Collection<Geocache> caches = ECApi.searchByCenter(center);
         final SearchResult searchResult = new SearchResult(caches);
-        return searchResult.filterSearchResults(false, false, Settings.getCacheType());
+        return searchResult.filterSearchResults(false, Settings.getCacheType());
     }
 
     @Override
@@ -134,13 +133,13 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
     }
 
     @Override
-    public boolean login(final Handler handler, final Context fromActivity) {
+    public boolean login(final Handler handler, @Nullable final Context fromActivity) {
         // login
         final StatusCode status = ecLogin.login();
 
-        if (app.showLoginToast && handler != null) {
+        if (ConnectorFactory.showLoginToast && handler != null) {
             handler.sendMessage(handler.obtainMessage(0, status));
-            app.showLoginToast = false;
+            ConnectorFactory.showLoginToast = false;
 
             // invoke settings activity to insert login details
             if (status == StatusCode.NO_LOGIN_INFO_STORED && fromActivity != null) {
@@ -153,6 +152,11 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
     @Override
     public String getUserName() {
         return ecLogin.getActualUserName();
+    }
+
+    @Override
+    public Credentials getCredentials() {
+        return Settings.getCredentials(R.string.pref_ecusername, R.string.pref_ecpassword);
     }
 
     @Override
@@ -181,7 +185,7 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
 
     @Override
     @NonNull
-    public String getLicenseText(final @NonNull Geocache cache) {
+    public String getLicenseText(@NonNull final Geocache cache) {
         // NOT TO BE TRANSLATED
         return "© " + cache.getOwnerDisplayName() + ", <a href=\"" + getCacheUrl(cache) + "\">" + getName() + "</a>, CC BY-NC-ND 3.0, alle Logeinträge © jeweiliger Autor";
     }
@@ -234,4 +238,24 @@ public class ECConnector extends AbstractConnector implements ISearchByGeocode, 
         return R.string.pref_ecpassword;
     }
 
+    @Override
+    public int getAvatarPreferenceKey() {
+        return R.string.pref_ec_avatar;
+    }
+
+    @Override
+    @Nullable
+    public String getGeocodeFromUrl(@NonNull final String url) {
+        final String geocode = "EC" + StringUtils.substringAfter(url, "extremcaching.com/index.php/output-2/");
+        if (canHandle(geocode)) {
+            return geocode;
+        }
+        return super.getGeocodeFromUrl(url);
+    }
+
+    @Override
+    @NonNull
+    public String getCreateAccountUrl() {
+        return "https://extremcaching.com/component/comprofiler/registers";
+    }
 }

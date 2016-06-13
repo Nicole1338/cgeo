@@ -2,6 +2,7 @@ package cgeo.geocaching.utils;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.jdt.annotation.NonNull;
 
 import android.text.Html;
 import android.text.Spanned;
@@ -10,6 +11,7 @@ import android.text.style.ImageSpan;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 
 public final class HtmlUtils {
 
@@ -21,9 +23,8 @@ public final class HtmlUtils {
      * Extract the text from a HTML based string. This is similar to what HTML.fromHtml(...) does, but this method also
      * removes the embedded images instead of replacing them by a small rectangular representation character.
      *
-     * @param html
-     * @return
      */
+    @NonNull
     public static String extractText(final CharSequence html) {
         if (StringUtils.isBlank(html)) {
             return StringUtils.EMPTY;
@@ -34,7 +35,7 @@ public final class HtmlUtils {
         if (html instanceof Spanned) {
             final Spanned text = (Spanned) html;
             final Object[] styles = text.getSpans(0, text.length(), Object.class);
-            final ArrayList<Pair<Integer, Integer>> removals = new ArrayList<>();
+            final List<Pair<Integer, Integer>> removals = new ArrayList<>();
             for (final Object style : styles) {
                 if (style instanceof ImageSpan) {
                     final int start = text.getSpanStart(style);
@@ -61,12 +62,24 @@ public final class HtmlUtils {
         return Html.fromHtml(result).toString().trim();
     }
 
-    public static String removeExtraParagraph(final String html) {
-        if (StringUtils.startsWith(html, "<p>") && StringUtils.endsWith(html, "</p>")) {
-            final String paragraph = StringUtils.substring(html, "<p>".length(), html.length() - "</p>".length()).trim();
-            if (extractText(paragraph).equals(paragraph)) {
-                return paragraph;
+    /**
+     * remove all tags that completely encapsulate the given HTML, e.g. all p and span tags around the content
+     */
+    @NonNull
+    public static String removeExtraTags(final String htmlIn) {
+        String html = StringUtils.trim(htmlIn);
+        while (StringUtils.startsWith(html, "<") && StringUtils.endsWith(html, ">")) {
+            final String tag = "<" + StringUtils.substringBetween(html, "<", ">") + ">";
+            final int tagLength = tag.length();
+            if (tagLength >= 10) {
+                break;
             }
+            final String endTag = "</" + StringUtils.substring(tag, 1);
+            final int endTagIndex = html.length() - endTag.length();
+            if (!StringUtils.startsWith(html, tag) || !StringUtils.endsWith(html, endTag) || StringUtils.indexOf(html, endTag) != endTagIndex) {
+                break;
+            }
+            html = StringUtils.substring(html, tagLength, endTagIndex).trim();
         }
         return html;
     }

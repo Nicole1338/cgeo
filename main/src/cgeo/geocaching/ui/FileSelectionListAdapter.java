@@ -1,11 +1,5 @@
 package cgeo.geocaching.ui;
 
-import butterknife.InjectView;
-
-import cgeo.geocaching.R;
-import cgeo.geocaching.files.IFileSelectionView;
-import cgeo.geocaching.utils.Log;
-
 import android.app.Activity;
 import android.graphics.Typeface;
 import android.view.LayoutInflater;
@@ -16,6 +10,11 @@ import android.widget.TextView;
 
 import java.io.File;
 import java.util.List;
+
+import butterknife.BindView;
+import cgeo.geocaching.R;
+import cgeo.geocaching.files.IFileSelectionView;
+import cgeo.geocaching.utils.Log;
 
 public class FileSelectionListAdapter extends ArrayAdapter<File> {
 
@@ -40,7 +39,7 @@ public class FileSelectionListAdapter extends ArrayAdapter<File> {
 
         View v = rowView;
 
-        ViewHolder holder;
+        final ViewHolder holder;
         if (v == null) {
             v = inflater.inflate(R.layout.mapfile_item, parent, false);
             holder = new ViewHolder(v);
@@ -67,7 +66,7 @@ public class FileSelectionListAdapter extends ArrayAdapter<File> {
     private class TouchListener implements View.OnClickListener {
         private File file = null;
 
-        public TouchListener(final File fileIn) {
+        TouchListener(final File fileIn) {
             file = fileIn;
         }
 
@@ -80,8 +79,8 @@ public class FileSelectionListAdapter extends ArrayAdapter<File> {
     }
 
     protected static final class ViewHolder extends AbstractViewHolder {
-        @InjectView(R.id.mapfilepath) protected TextView filepath;
-        @InjectView(R.id.mapfilename) protected TextView filename;
+        @BindView(R.id.mapfilepath) TextView filepath;
+        @BindView(R.id.mapfilename) TextView filename;
 
         public ViewHolder(final View view) {
             super(view);

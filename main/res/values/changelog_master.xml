@@ -3,9 +3,19 @@
   <!-- changelog for the master branch -->
   <string name="changelog_master" translatable="false">
     <b>Next feature release:</b>\n
-    · New: confirmation on backup/restore\n
-    · New: sort events of same date by time (if recognized from cache description)\n
-    · New: show rudimentary details for geocaching.com.au swaggies\n
+    · New: Allow caches to be stored on more than one list\n
+    · New: Different http libraries for more efficient network communication\n
+    · New: Update of Locus API for improved interworking\n
+    · New: Reworked and simplified authentication screens\n
+    · New: Lists automatically sorted by name, if they contain only similarly named caches\n
+    · New: Online search support for Geocaching.su\n
+    · New: Select between cache and parking place when using navigation for driving\n
+    · New: Show will attend state in cache details, if a matching log is available\n
+    · New: Smileys are now filtered from image list\n
+    · New: Log images shown for OpenCaching caches\n
+    · Changed: Show more text of cache title in lists\n
+    · Removed: No more option to show only short description of a cache\n
+    \n
     \n
   </string>
 </resources>

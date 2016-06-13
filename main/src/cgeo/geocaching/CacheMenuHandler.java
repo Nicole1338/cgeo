@@ -1,10 +1,13 @@
 package cgeo.geocaching;
 
 import cgeo.calendar.CalendarAddon;
-import cgeo.geocaching.apps.cache.navi.NavigationAppFactory;
-import cgeo.geocaching.apps.cache.navi.NavigationSelectionActionProvider;
+import cgeo.geocaching.apps.navi.NavigationAppFactory;
+import cgeo.geocaching.apps.navi.NavigationSelectionActionProvider;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.settings.Settings;
 import cgeo.geocaching.ui.AbstractUIFactory;
+
+import org.eclipse.jdt.annotation.NonNull;
 
 import android.app.Activity;
 import android.support.v4.app.Fragment;
@@ -30,21 +33,20 @@ public final class CacheMenuHandler extends AbstractUIFactory {
      *
      */
     interface ActivityInterface {
-        public void navigateTo();
+        void navigateTo();
 
-        public void showNavigationMenu();
+        void showNavigationMenu();
 
-        public void cachesAround();
+        void cachesAround();
 
     }
 
-    public static boolean onMenuItemSelected(final MenuItem item, final CacheMenuHandler.ActivityInterface activityInterface, final Geocache cache) {
-        assert activityInterface instanceof Activity || activityInterface instanceof Fragment;
+    public static boolean onMenuItemSelected(final MenuItem item, @NonNull final CacheMenuHandler.ActivityInterface activityInterface, final Geocache cache) {
         final Activity activity;
         if (activityInterface instanceof Activity) {
             activity = (Activity) activityInterface;
         } else {
-            activity = ((Fragment)activityInterface).getActivity();
+            activity = ((Fragment) activityInterface).getActivity();
         }
 
         switch (item.getItemId()) {
@@ -88,6 +90,7 @@ public final class CacheMenuHandler extends AbstractUIFactory {
         final boolean hasCoords = cache.getCoords() != null;
         menu.findItem(R.id.menu_default_navigation).setVisible(hasCoords);
         menu.findItem(R.id.menu_navigate).setVisible(hasCoords);
+        menu.findItem(R.id.menu_delete).setVisible(cache.isOffline());
         menu.findItem(R.id.menu_caches_around).setVisible(hasCoords && cache.supportsCachesAround());
         menu.findItem(R.id.menu_calendar).setVisible(cache.canBeAddedToCalendar());
         menu.findItem(R.id.menu_log_visit).setVisible(cache.supportsLogging() && !Settings.getLogOffline());
@@ -98,7 +101,7 @@ public final class CacheMenuHandler extends AbstractUIFactory {
         final MenuItem shareItem = menu.findItem(R.id.menu_share);
         final ShareActionProvider shareActionProvider = (ShareActionProvider)
                 MenuItemCompat.getActionProvider(shareItem);
-        if(shareActionProvider != null) {
+        if (shareActionProvider != null) {
             shareActionProvider.setShareIntent(cache.getShareIntent());
         }
 

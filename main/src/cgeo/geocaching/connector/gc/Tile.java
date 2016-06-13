@@ -1,21 +1,17 @@
 package cgeo.geocaching.connector.gc;
 
-import cgeo.geocaching.ICoordinates;
 import cgeo.geocaching.location.Geopoint;
 import cgeo.geocaching.location.Viewport;
+import cgeo.geocaching.models.ICoordinates;
 import cgeo.geocaching.network.Network;
 import cgeo.geocaching.network.Parameters;
+import cgeo.geocaching.utils.AndroidRxUtils;
 import cgeo.geocaching.utils.LeastRecentlyUsedSet;
-import cgeo.geocaching.utils.Log;
-import cgeo.geocaching.utils.RxUtils;
 
-import ch.boye.httpclientandroidlib.HttpResponse;
-
+import okhttp3.Response;
 import org.eclipse.jdt.annotation.NonNull;
-
-import rx.Observable;
-import rx.functions.Func0;
-import rx.util.async.Async;
+import rx.Single;
+import rx.functions.Func1;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -49,7 +45,7 @@ public class Tile {
         }
     }
 
-    public final static TileCache cache = new TileCache();
+    public static final TileCache cache = new TileCache();
 
     private final int tileX;
     private final int tileY;
@@ -144,7 +140,6 @@ public class Tile {
      *            First point
      * @param right
      *            Second point
-     * @return
      */
     static int calcZoomLon(final Geopoint left, final Geopoint right, final int numberOfTiles) {
 
@@ -177,7 +172,6 @@ public class Tile {
      *            First point
      * @param top
      *            Second point
-     * @return
      */
     static int calcZoomLat(final Geopoint bottom, final Geopoint top, final int numberOfTiles) {
 
@@ -208,8 +202,6 @@ public class Tile {
      * Calculates the inverted hyperbolic sine
      * (after Bronstein, Semendjajew: Taschenbuch der Mathematik)
      *
-     * @param x
-     * @return
      */
     private static double asinh(final double x) {
         return Math.log(x + Math.sqrt(x * x + 1.0));
@@ -236,40 +228,47 @@ public class Tile {
     /** Request JSON informations for a tile. Return as soon as the request has been made, before the answer has been
      * read.
      *
-     * @return An observable with one element, which may be <tt>null</tt>.
+     * @return A single with one element, or an IOException
      */
 
-    static Observable<String> requestMapInfo(final String url, final Parameters params, final String referer) {
-        final HttpResponse response = Network.getRequest(url, params, new Parameters("Referer", referer));
-        return Async.start(new Func0<String>() {
-            @Override
-            public String call() {
-                return Network.getResponseData(response);
-            }
-        }, RxUtils.networkScheduler);
+    static Single<String> requestMapInfo(final String url, final Parameters params, final String referer) {
+        try {
+            final Response response = Network.getRequest(url, params, new Parameters("Referer", referer))
+                    .toBlocking().value();
+            return Single.just(response).flatMap(Network.getResponseData);
+        } catch (final Exception e) {
+            return Single.error(e);
+        }
     }
 
     /** Request .png image for a tile. Return as soon as the request has been made, before the answer has been
      * read and processed.
      *
-     * @return An observable with one element, which may be <tt>null</tt>.
+     * @return A single with one element, or an IOException
      */
-    static Observable<Bitmap> requestMapTile(final Parameters params) {
-        final HttpResponse response = Network.getRequest(GCConstants.URL_MAP_TILE, params, new Parameters("Referer", GCConstants.URL_LIVE_MAP));
-        return Async.start(new Func0<Bitmap>() {
-            @Override
-            public Bitmap call() {
-                try {
-                    return response != null ? BitmapFactory.decodeStream(response.getEntity().getContent()) : null;
-                } catch (final IOException e) {
-                    Log.e("Tile.requestMapTile() ", e);
-                    return null;
-                }
-            }
-        }, RxUtils.computationScheduler);
+    static Single<Bitmap> requestMapTile(final Parameters params) {
+        try {
+            final Response response = Network.getRequest(GCConstants.URL_MAP_TILE, params, new Parameters("Referer", GCConstants.URL_LIVE_MAP))
+                    .toBlocking().value();
+            return Single.just(response)
+                    .flatMap(new Func1<Response, Single<Bitmap>>() {
+                        @Override
+                        public Single<Bitmap> call(final Response response) {
+                            if (response.isSuccessful()) {
+                                final Bitmap bitmap = BitmapFactory.decodeStream(response.body().byteStream());
+                                if (bitmap != null) {
+                                    return Single.just(bitmap);
+                                }
+                            }
+                            return Single.error(new IOException("could not decode bitmap"));
+                        }
+                    }).subscribeOn(AndroidRxUtils.computationScheduler);
+        } catch (final Exception e) {
+            return Single.error(e);
+        }
     }
 
-    public boolean containsPoint(final @NonNull ICoordinates point) {
+    public boolean containsPoint(@NonNull final ICoordinates point) {
         return viewPort.contains(point);
     }
 
@@ -281,11 +280,9 @@ public class Tile {
      * Calculate needed tiles for the given viewport to cover it with
      * max 2x2 tiles
      *
-     * @param viewport
-     * @return
      */
     protected static Set<Tile> getTilesForViewport(final Viewport viewport) {
-        return getTilesForViewport(viewport, 2, Tile.ZOOMLEVEL_MIN);
+        return getTilesForViewport(viewport, 2, ZOOMLEVEL_MIN);
     }
 
     /**
@@ -293,16 +290,12 @@ public class Tile {
      * You can define the minimum number of tiles on the longer axis
      * and/or the minimum zoom level.
      *
-     * @param viewport
-     * @param tilesOnAxis
-     * @param minZoom
-     * @return
      */
     protected static Set<Tile> getTilesForViewport(final Viewport viewport, final int tilesOnAxis, final int minZoom) {
         final Set<Tile> tiles = new HashSet<>();
         final int zoom = Math.max(
-                Math.min(Tile.calcZoomLon(viewport.bottomLeft, viewport.topRight, tilesOnAxis),
-                        Tile.calcZoomLat(viewport.bottomLeft, viewport.topRight, tilesOnAxis)),
+                Math.min(calcZoomLon(viewport.bottomLeft, viewport.topRight, tilesOnAxis),
+                        calcZoomLat(viewport.bottomLeft, viewport.topRight, tilesOnAxis)),
                 minZoom);
 
         final Tile tileBottomLeft = new Tile(viewport.bottomLeft, zoom);

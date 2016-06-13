@@ -1,7 +1,7 @@
 package cgeo.geocaching.apps;
 
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.utils.ProcessUtils;
 
 import org.apache.commons.lang3.StringUtils;
@@ -9,28 +9,24 @@ import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
 import android.content.Intent;
+import android.support.annotation.StringRes;
 
 public abstract class AbstractApp implements App {
 
     @Nullable private final String packageName;
-    @Nullable private final String intent;
+    @Nullable protected final String intent;
     @NonNull
     private final String name;
-    /**
-     * a unique id, defined in res/values/ids.xml
-     */
-    private final int id;
 
-    protected AbstractApp(@NonNull final String name, final int id, @Nullable final String intent,
+    protected AbstractApp(@NonNull final String name, @Nullable final String intent,
             @Nullable final String packageName) {
         this.name = name;
-        this.id = id;
         this.intent = intent;
         this.packageName = packageName;
     }
 
-    protected AbstractApp(@NonNull final String name, final int id, @Nullable final String intent) {
-        this(name, id, intent, null);
+    protected AbstractApp(@NonNull final String name, @Nullable final String intent) {
+        this(name, intent, null);
     }
 
     @Override
@@ -38,6 +34,10 @@ public abstract class AbstractApp implements App {
         if (StringUtils.isNotEmpty(packageName) && ProcessUtils.isLaunchable(packageName)) {
             return true;
         }
+        if (intent == null) {
+            return false;
+        }
+        assert intent != null; // eclipse issue
         return ProcessUtils.isIntentAvailable(intent);
     }
 
@@ -57,17 +57,12 @@ public abstract class AbstractApp implements App {
         return name;
     }
 
-    @Override
-    public int getId() {
-        return id;
-    }
-
-    protected static String getString(final int ressourceId) {
-        return CgeoApplication.getInstance().getString(ressourceId);
+    protected static String getString(@StringRes final int resourceId) {
+        return CgeoApplication.getInstance().getString(resourceId);
     }
 
     @Override
-    public boolean isEnabled(final Geocache cache) {
-        return cache != null;
+    public boolean isEnabled(@NonNull final Geocache cache) {
+        return true;
     }
 }

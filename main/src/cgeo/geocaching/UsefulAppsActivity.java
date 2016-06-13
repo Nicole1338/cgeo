@@ -1,12 +1,5 @@
 package cgeo.geocaching;
 
-import butterknife.ButterKnife;
-import butterknife.InjectView;
-
-import cgeo.geocaching.activity.AbstractActionBarActivity;
-import cgeo.geocaching.ui.AbstractViewHolder;
-
-import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,14 +11,23 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import org.eclipse.jdt.annotation.NonNull;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import cgeo.geocaching.activity.AbstractActionBarActivity;
+import cgeo.geocaching.compatibility.Compatibility;
+import cgeo.geocaching.ui.AbstractViewHolder;
+import cgeo.geocaching.utils.ProcessUtils;
+
 public class UsefulAppsActivity extends AbstractActionBarActivity {
 
-    @InjectView(R.id.apps_list) protected ListView list;
+    @BindView(R.id.apps_list) protected ListView list;
 
     protected static class ViewHolder extends AbstractViewHolder {
-        @InjectView(R.id.title) protected TextView title;
-        @InjectView(R.id.image) protected ImageView image;
-        @InjectView(R.id.description) protected TextView description;
+        @BindView(R.id.title) protected TextView title;
+        @BindView(R.id.image) protected ImageView image;
+        @BindView(R.id.description) protected TextView description;
 
         public ViewHolder(final View rowView) {
             super(rowView);
@@ -36,57 +38,47 @@ public class UsefulAppsActivity extends AbstractActionBarActivity {
         private final int titleId;
         private final int descriptionId;
         private final int iconId;
+        @NonNull
         private final String packageName;
 
-        public HelperApp(final int title, final int description, final int icon, final String packageName) {
+        HelperApp(final int title, final int description, final int icon, @NonNull final String packageName) {
             this.titleId = title;
             this.descriptionId = description;
             this.iconId = icon;
             this.packageName = packageName;
         }
 
-        @SuppressWarnings("deprecation")
-        private void installFromMarket(final Activity activity) {
-            try {
-                // allow also opening pure http URLs in addition to market packages
-                final String url = (packageName.startsWith("http:")) ? packageName : "market://details?id=" + packageName;
-                final Intent marketIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                marketIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-                activity.startActivity(marketIntent);
-
-            } catch (final RuntimeException ignored) {
-                // market not available in standard emulator
-            }
-        }
     }
 
     private static final HelperApp[] HELPER_APPS = {
             new HelperApp(R.string.helper_calendar_title, R.string.helper_calendar_description, R.drawable.cgeo, "cgeo.calendar"),
             new HelperApp(R.string.helper_sendtocgeo_title, R.string.helper_sendtocgeo_description, R.drawable.cgeo, "http://send2.cgeo.org"),
             new HelperApp(R.string.helper_contacts_title, R.string.helper_contacts_description, R.drawable.cgeo, "cgeo.contacts"),
+            new HelperApp(R.string.helper_wear_title, R.string.helper_wear_description, R.drawable.helper_wear, "com.javadog.cgeowear"),
             new HelperApp(R.string.helper_pocketquery_title, R.string.helper_pocketquery_description, R.drawable.helper_pocketquery, "org.pquery"),
-            new HelperApp(R.string.helper_locus_title, R.string.helper_locus_description, R.drawable.helper_locus, "menion.android.locus"),
             new HelperApp(R.string.helper_google_translate_title, R.string.helper_google_translate_description, R.drawable.helper_google_translate, "com.google.android.apps.translate"),
+            new HelperApp(R.string.helper_where_you_go_title, R.string.helper_where_you_go_description, R.drawable.helper_where_you_go, "menion.android.whereyougo"),
             new HelperApp(R.string.helper_gpsstatus_title, R.string.helper_gpsstatus_description, R.drawable.helper_gpsstatus, "com.eclipsim.gpsstatus2"),
             new HelperApp(R.string.helper_bluetoothgps_title, R.string.helper_bluetoothgps_description, R.drawable.helper_bluetoothgps, "googoo.android.btgps"),
             new HelperApp(R.string.helper_barcode_title, R.string.helper_barcode_description, R.drawable.helper_barcode, "com.google.zxing.client.android"),
+            new HelperApp(R.string.helper_locus_title, R.string.helper_locus_description, R.drawable.helper_locus, "menion.android.locus"),
     };
 
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState, R.layout.usefulapps_activity);
 
-        ButterKnife.inject(this);
+        ButterKnife.bind(this);
 
         list.setAdapter(new ArrayAdapter<HelperApp>(this, R.layout.usefulapps_item, HELPER_APPS) {
             @Override
             public View getView(final int position, final View convertView, final android.view.ViewGroup parent) {
                 View rowView = convertView;
-                if (null == rowView) {
+                if (rowView == null) {
                     rowView = getLayoutInflater().inflate(R.layout.usefulapps_item, parent, false);
                 }
                 ViewHolder holder = (ViewHolder) rowView.getTag();
-                if (null == holder) {
+                if (holder == null) {
                     holder = new ViewHolder(rowView);
                 }
 
@@ -97,7 +89,7 @@ public class UsefulAppsActivity extends AbstractActionBarActivity {
 
             private void fillViewHolder(final ViewHolder holder, final HelperApp app) {
                 holder.title.setText(res.getString(app.titleId));
-                holder.image.setImageDrawable(res.getDrawable(app.iconId));
+                holder.image.setImageDrawable(Compatibility.getDrawable(res, app.iconId));
                 holder.description.setText(Html.fromHtml(res.getString(app.descriptionId)));
             }
         });
@@ -107,7 +99,11 @@ public class UsefulAppsActivity extends AbstractActionBarActivity {
             @Override
             public void onItemClick(final AdapterView<?> parent, final View view, final int position, final long id) {
                 final HelperApp helperApp = HELPER_APPS[position];
-                helperApp.installFromMarket(UsefulAppsActivity.this);
+                if (helperApp.packageName.startsWith("http")) {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(helperApp.packageName)));
+                } else {
+                    ProcessUtils.openMarket(UsefulAppsActivity.this, helperApp.packageName);
+                }
             }
         });
     }

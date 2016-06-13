@@ -13,7 +13,7 @@
         android:id="@+id/menu_navigate"
         android:icon="@drawable/ic_menu_goto"
         android:title="@string/cache_menu_navigate"
-        app:actionProviderClass="cgeo.geocaching.apps.cache.navi.NavigationSelectionActionProvider"
+        app:actionProviderClass="cgeo.geocaching.apps.navi.NavigationSelectionActionProvider"
         app:showAsAction="ifRoom">
     </item>
     <item
@@ -50,7 +50,7 @@
         app:showAsAction="ifRoom">
     </item>
     <item
-        android:id="@+id/menu_store"
+        android:id="@+id/menu_store_in_list"
         android:icon="@drawable/ic_menu_save"
         android:title="@string/cache_offline_store"
         android:visible="false"
@@ -83,5 +83,43 @@
         app:actionProviderClass="android.support.v7.widget.ShareActionProvider"
         app:showAsAction="ifRoom">
     </item>
-
+    <item
+        android:id="@+id/menu_checker"
+        android:title="@string/cache_menu_checker"
+        android:visible="false"
+        app:showAsAction="ifRoom">
+    </item>
+    <item
+        android:id="@+id/menu_ignore"
+        android:title="@string/cache_menu_ignore"
+        android:visible="false"
+        app:showAsAction="ifRoom">
+    </item>
+    <item
+        android:id="@+id/menu_export"
+        android:title="@string/export"
+        app:showAsAction="never|withText">
+        <menu>
+            <item
+                android:id="@+id/menu_export_gpx"
+                android:title="@string/export_gpx">
+            </item>
+            <item
+                android:id="@+id/menu_export_fieldnotes"
+                android:title="@string/export_fieldnotes">
+            </item>
+        </menu>
+    </item>
+    <item
+        android:id="@+id/menu_edit_fieldnote"
+        android:icon="@drawable/ic_menu_rotate"
+        android:title="@string/cache_personal_note"
+        android:visible="false">
+    </item>
+    <item
+        android:id="@+id/menu_app_invite"
+        android:title="@string/invitation_action"
+        app:showAsAction="ifRoom"
+        android:visible="false">
+    </item>
 </menu>

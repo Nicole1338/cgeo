@@ -6,7 +6,9 @@ import rx.Subscription;
 import rx.subscriptions.CompositeSubscription;
 
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
+import android.support.annotation.StringRes;
 
 /**
  * Handler with a cancel policy. Once cancelled, the handler will not handle
@@ -19,6 +21,14 @@ public abstract class CancellableHandler extends Handler {
     private volatile boolean cancelled = false;
     private final CompositeSubscription subscriptions = new CompositeSubscription();
 
+    public CancellableHandler(final Looper serviceLooper) {
+        super(serviceLooper);
+    }
+
+    public CancellableHandler() {
+        super();
+    }
+
     private static class CancelHolder {
         final Object payload;
 
@@ -28,7 +38,7 @@ public abstract class CancellableHandler extends Handler {
     }
 
     @Override
-    final public void handleMessage(final Message message) {
+    public final void handleMessage(final Message message) {
         if (cancelled) {
             return;
         }
@@ -45,7 +55,7 @@ public abstract class CancellableHandler extends Handler {
     /**
      * Add a subscription to the list of subscriptions to be subscribed at cancellation time.
      */
-    final public void unsubscribeIfCancelled(final Subscription subscription) {
+    public final void unsubscribeIfCancelled(final Subscription subscription) {
         subscriptions.add(subscription);
         if (cancelled) {
             // Protect against race conditions
@@ -60,7 +70,7 @@ public abstract class CancellableHandler extends Handler {
      * @param message
      *            the message to handle
      */
-    abstract protected void handleRegularMessage(final Message message);
+    protected abstract void handleRegularMessage(final Message message);
 
     /**
      * Handle a cancel message.
@@ -89,24 +99,14 @@ public abstract class CancellableHandler extends Handler {
      * @return a cancel message
      */
     public Message cancelMessage(final Object extra) {
-        return this.obtainMessage(0, new CancelHolder(extra));
+        return obtainMessage(0, new CancelHolder(extra));
     }
 
     /**
      * Cancel the current handler. This can be called from any thread.
      */
     public void cancel() {
-        cancel(null);
-    }
-
-    /**
-     * Cancel the current handler. This can be called from any thread.
-     *
-     * @param extra
-     *            the extra parameter to give to the cancel handler
-     */
-    public void cancel(final Object extra) {
-        cancelMessage(extra).sendToTarget();
+        cancelMessage().sendToTarget();
     }
 
     /**
@@ -129,8 +129,8 @@ public abstract class CancellableHandler extends Handler {
         return handler != null && handler.isCancelled();
     }
 
-    public static void sendLoadProgressDetail(final Handler handler, final int resourceId) {
-        if (null != handler) {
+    public static void sendLoadProgressDetail(final Handler handler, @StringRes final int resourceId) {
+        if (handler != null) {
             handler.obtainMessage(UPDATE_LOAD_PROGRESS_DETAIL, CgeoApplication.getInstance().getString(resourceId)).sendToTarget();
         }
     }

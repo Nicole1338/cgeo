@@ -17,7 +17,7 @@ public final class Log {
     private static final String TAG = "cgeo";
 
     private static final class StackTraceDebug extends RuntimeException {
-        final static private long serialVersionUID = 27058374L;
+        private static final long serialVersionUID = 27058374L;
     }
 
     /**
@@ -37,14 +37,15 @@ public final class Log {
     /**
      * Save a copy of the debug flag from the settings for performance reasons.
      *
-     * @param isDebug
      */
     public static void setDebug(final boolean isDebug) {
         Log.isDebug = isDebug;
     }
 
     private static String addThreadInfo(final String msg) {
-        return new StringBuilder("[").append(Thread.currentThread().getName()).append("] ").append(msg).toString();
+        final String threadName = Thread.currentThread().getName();
+        final String shortName = threadName.startsWith("OkHttp") ? "OkHttp" : threadName;
+        return new StringBuilder("[").append(shortName).append("] ").append(msg).toString();
     }
 
     public static void v(final String msg) {
@@ -93,10 +94,19 @@ public final class Log {
 
     public static void e(final String msg) {
         android.util.Log.e(TAG, addThreadInfo(msg));
+        if (isDebug) {
+            throw new RuntimeException("Aborting on Log.e()");
+        }
     }
 
     public static void e(final String msg, final Throwable t) {
         android.util.Log.e(TAG, addThreadInfo(msg), t);
+        if (isDebug) {
+            if (t instanceof RuntimeException) {
+                throw (RuntimeException) t;
+            }
+            throw new RuntimeException("Aborting on Log.e()", t);
+        }
     }
 
     /**
@@ -122,7 +132,7 @@ public final class Log {
             writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), CharEncoding.UTF_8));
             writer.write(addThreadInfo(msg));
         } catch (final IOException e) {
-            Log.e("logToFile: cannot write to " + file, e);
+            e("logToFile: cannot write to " + file, e);
         } finally {
             IOUtils.closeQuietly(writer);
         }
@@ -137,7 +147,7 @@ public final class Log {
         try {
             throw new StackTraceDebug();
         } catch (final StackTraceDebug dbg) {
-            Log.d(msg, dbg);
+            d(msg, dbg);
         }
     }
 }

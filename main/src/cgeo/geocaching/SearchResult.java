@@ -8,7 +8,9 @@ import cgeo.geocaching.enumerations.LoadFlags.LoadFlag;
 import cgeo.geocaching.enumerations.LoadFlags.SaveFlag;
 import cgeo.geocaching.enumerations.StatusCode;
 import cgeo.geocaching.gcvote.GCVote;
-import cgeo.geocaching.utils.RxUtils;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.storage.DataStore;
+import cgeo.geocaching.utils.AndroidRxUtils;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -19,7 +21,6 @@ import rx.Observable;
 import rx.functions.Func0;
 import rx.functions.Func1;
 import rx.functions.Func2;
-import rx.util.async.Async;
 
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -29,29 +30,30 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class SearchResult implements Parcelable {
 
-    final private Set<String> geocodes;
-    final private Set<String> filteredGeocodes;
-    private StatusCode error = null;
+    private final Set<String> geocodes;
+    private final Set<String> filteredGeocodes;
+    @NonNull private StatusCode error = StatusCode.NO_ERROR;
     private String url = "";
-    public String[] viewstates = null;
+    private String[] viewstates = null;
     /**
      * Overall number of search results matching our search on geocaching.com. If this number is higher than 20, we have
      * to fetch multiple pages to get all caches.
      */
     private int totalCountGC = 0;
 
-    final public static Parcelable.Creator<SearchResult> CREATOR = new Parcelable.Creator<SearchResult>() {
+    public static final Parcelable.Creator<SearchResult> CREATOR = new Parcelable.Creator<SearchResult>() {
         @Override
-        public SearchResult createFromParcel(Parcel in) {
+        public SearchResult createFromParcel(final Parcel in) {
             return new SearchResult(in);
         }
 
         @Override
-        public SearchResult[] newArray(int size) {
+        public SearchResult[] newArray(final int size) {
             return new SearchResult[size];
         }
     };
@@ -66,7 +68,7 @@ public class SearchResult implements Parcelable {
     /**
      * Build a new empty search result with an error status.
      */
-    public SearchResult(final StatusCode statusCode) {
+    public SearchResult(@NonNull final StatusCode statusCode) {
         this();
         error = statusCode;
     }
@@ -142,7 +144,7 @@ public class SearchResult implements Parcelable {
      *
      * @param caches the non-null collection of caches to include
      */
-    public SearchResult(final Collection<Geocache> caches) {
+    public SearchResult(@NonNull final Collection<Geocache> caches) {
         this();
         addAndPutInCache(caches);
     }
@@ -176,11 +178,12 @@ public class SearchResult implements Parcelable {
         return geocodes.size();
     }
 
+    @NonNull
     public StatusCode getError() {
         return error;
     }
 
-    public void setError(final StatusCode error) {
+    public void setError(@NonNull final StatusCode error) {
         this.error = error;
     }
 
@@ -188,7 +191,7 @@ public class SearchResult implements Parcelable {
         return url;
     }
 
-    public void setUrl(String url) {
+    public void setUrl(final String url) {
         this.url = url;
     }
 
@@ -196,7 +199,7 @@ public class SearchResult implements Parcelable {
         return viewstates;
     }
 
-    public void setViewstates(String[] viewstates) {
+    public void setViewstates(final String[] viewstates) {
         if (GCLogin.isEmpty(viewstates)) {
             return;
         }
@@ -212,28 +215,19 @@ public class SearchResult implements Parcelable {
         return totalCountGC;
     }
 
-    public void setTotalCountGC(int totalCountGC) {
+    public void setTotalCountGC(final int totalCountGC) {
         this.totalCountGC = totalCountGC;
     }
 
-    /**
-     * @param excludeDisabled
-     * @param excludeMine
-     * @param cacheType
-     * @return
-     */
-    public SearchResult filterSearchResults(final boolean excludeDisabled, final boolean excludeMine, final CacheType cacheType) {
-
-        SearchResult result = new SearchResult(this);
+    public SearchResult filterSearchResults(final boolean excludeDisabled, final CacheType cacheType) {
+        final SearchResult result = new SearchResult(this);
         result.geocodes.clear();
-        final ArrayList<Geocache> includedCaches = new ArrayList<>();
+        final List<Geocache> includedCaches = new ArrayList<>();
         final Set<Geocache> caches = DataStore.loadCaches(geocodes, LoadFlags.LOAD_CACHE_OR_DB);
         int excluded = 0;
-        for (Geocache cache : caches) {
+        for (final Geocache cache : caches) {
             // Is there any reason to exclude the cache from the list?
-            final boolean excludeCache = (excludeDisabled && (cache.isDisabled() || cache.isArchived())) ||
-                    (excludeMine && (cache.isOwner() || cache.isFound())) ||
-                    (!cacheType.contains(cache));
+            final boolean excludeCache = (excludeDisabled && (cache.isDisabled() || cache.isArchived())) || !cacheType.contains(cache);
             if (excludeCache) {
                 excluded++;
             } else {
@@ -265,13 +259,13 @@ public class SearchResult implements Parcelable {
     }
 
     /** Add the geocodes to the search. No caches are loaded into the CacheCache */
-    public boolean addGeocodes(Set<String> geocodes) {
+    public boolean addGeocodes(final Set<String> geocodes) {
         return this.geocodes.addAll(geocodes);
     }
 
     /** Add the cache geocode to the search and store the cache in the CacheCache */
-    public void addAndPutInCache(final Collection<Geocache> caches) {
-        for (Geocache geocache : caches) {
+    public void addAndPutInCache(@NonNull final Collection<Geocache> caches) {
+        for (final Geocache geocache : caches) {
             addGeocode(geocache.getGeocode());
         }
         DataStore.saveCaches(caches, EnumSet.of(SaveFlag.CACHE));
@@ -290,7 +284,7 @@ public class SearchResult implements Parcelable {
         return false;
     }
 
-    public void addFilteredGeocodes(Set<String> cachedMissingFromSearch) {
+    public void addFilteredGeocodes(final Set<String> cachedMissingFromSearch) {
         filteredGeocodes.addAll(cachedMissingFromSearch);
     }
 
@@ -298,7 +292,7 @@ public class SearchResult implements Parcelable {
         return Collections.unmodifiableSet(filteredGeocodes);
     }
 
-    public void addSearchResult(SearchResult other) {
+    public void addSearchResult(final SearchResult other) {
         if (other == null) {
             return;
         }
@@ -314,17 +308,28 @@ public class SearchResult implements Parcelable {
         }
     }
 
+    /**
+     * execute the given connector request in parallel on all active connectors
+     *
+     * @param connectors
+     *            connectors to be considered in request
+     * @param func
+     *            connector request
+     */
     public static <C extends IConnector> SearchResult parallelCombineActive(final Collection<C> connectors,
                                                                             final Func1<C, SearchResult> func) {
         return Observable.from(connectors).flatMap(new Func1<C, Observable<SearchResult>>() {
             @Override
             public Observable<SearchResult> call(final C connector) {
-                return connector.isActive() ? Async.start(new Func0<SearchResult>() {
+                if (!connector.isActive()) {
+                    return Observable.empty();
+                }
+                return Observable.defer(new Func0<Observable<SearchResult>>() {
                     @Override
-                    public SearchResult call() {
-                        return func.call(connector);
+                    public Observable<SearchResult> call() {
+                        return Observable.just(func.call(connector));
                     }
-                }, RxUtils.networkScheduler) : Observable.<SearchResult>empty();
+                }).subscribeOn(AndroidRxUtils.networkScheduler);
             }
         }).reduce(new SearchResult(), new Func2<SearchResult, SearchResult, SearchResult>() {
             @Override

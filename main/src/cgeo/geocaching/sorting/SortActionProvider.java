@@ -2,12 +2,12 @@ package cgeo.geocaching.sorting;
 
 import cgeo.geocaching.R;
 import cgeo.geocaching.utils.Log;
+import cgeo.geocaching.utils.TextUtils;
 
 import org.eclipse.jdt.annotation.NonNull;
 
-import rx.functions.Action1;
-
 import android.content.Context;
+import android.support.annotation.StringRes;
 import android.support.v4.view.ActionProvider;
 import android.view.MenuItem;
 import android.view.MenuItem.OnMenuItemClickListener;
@@ -17,6 +17,8 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+
+import rx.functions.Action1;
 
 /**
  * Provides a sub menu for sorting caches. Register your listener in the onCreateOptionsMenu of the containing activity.
@@ -36,11 +38,14 @@ public class SortActionProvider extends ActionProvider implements OnMenuItemClic
      */
     private CacheComparator selection;
 
+    // Used to change menu Filter label
+    private boolean isEventsOnly = false;
+
     private static final class ComparatorEntry {
         private final String name;
         private final Class<? extends CacheComparator> cacheComparator;
 
-        public ComparatorEntry(final String name, final Class<? extends CacheComparator> cacheComparator) {
+        ComparatorEntry(final String name, final Class<? extends CacheComparator> cacheComparator) {
             this.name = name;
             this.cacheComparator = cacheComparator;
         }
@@ -51,19 +56,24 @@ public class SortActionProvider extends ActionProvider implements OnMenuItemClic
         }
     }
 
+
     public SortActionProvider(final Context context) {
         super(context);
         mContext = context;
-        registerComparators();
     }
 
-    private void register(final int resourceId, final Class<? extends CacheComparator> comparatorClass) {
+    private void register(@StringRes final int resourceId, final Class<? extends CacheComparator> comparatorClass) {
         registry.add(new ComparatorEntry(mContext.getString(resourceId), comparatorClass));
     }
 
     private void registerComparators() {
+        registry.clear();
         register(R.string.caches_sort_distance, DistanceComparator.class);
-        register(R.string.caches_sort_date_hidden, DateComparator.class);
+        if (isEventsOnly) {
+            register(R.string.caches_sort_eventdate, EventDateComparator.class);
+        } else {
+            register(R.string.caches_sort_date_hidden, DateComparator.class);
+        }
         register(R.string.caches_sort_difficulty, DifficultyComparator.class);
         register(R.string.caches_sort_finds, FindsComparator.class);
         register(R.string.caches_sort_geocode, GeocodeComparator.class);
@@ -84,25 +94,26 @@ public class SortActionProvider extends ActionProvider implements OnMenuItemClic
 
             @Override
             public int compare(final ComparatorEntry lhs, final ComparatorEntry rhs) {
-                return lhs.name.compareToIgnoreCase(rhs.name);
+                return TextUtils.COLLATOR.compare(lhs.name, rhs.name);
             }
         });
     }
 
     @Override
-    public View onCreateActionView(){
+    public View onCreateActionView() {
         // must return null, otherwise onPrepareSubMenu is not called
         return null;
     }
 
     @Override
-    public boolean hasSubMenu(){
+    public boolean hasSubMenu() {
         return true;
     }
 
     @Override
-    public void onPrepareSubMenu(final SubMenu subMenu){
+    public void onPrepareSubMenu(final SubMenu subMenu) {
         subMenu.clear();
+        registerComparators();
         for (int i = 0; i < registry.size(); i++) {
             final ComparatorEntry comparatorEntry = registry.get(i);
             final MenuItem menuItem = subMenu.add(MENU_GROUP, i, i, comparatorEntry.name);
@@ -111,18 +122,15 @@ public class SortActionProvider extends ActionProvider implements OnMenuItemClic
                 if (comparatorEntry.cacheComparator == null) {
                     menuItem.setChecked(true);
                 }
-            }
-            else {
-                if (selection.getClass().equals(comparatorEntry.cacheComparator)) {
-                    menuItem.setChecked(true);
-                }
+            } else if (selection.getClass().equals(comparatorEntry.cacheComparator)) {
+                menuItem.setChecked(true);
             }
         }
         subMenu.setGroupCheckable(MENU_GROUP, true, true);
     }
 
     @Override
-    public boolean onMenuItemClick(final MenuItem item){
+    public boolean onMenuItemClick(final MenuItem item) {
         callListener(registry.get(item.getItemId()).cacheComparator);
         return true;
     }
@@ -131,8 +139,7 @@ public class SortActionProvider extends ActionProvider implements OnMenuItemClic
         try {
             if (cacheComparator == null) {
                 onClickListener.call(null);
-            }
-            else {
+            } else {
                 final CacheComparator comparator = cacheComparator.newInstance();
                 onClickListener.call(comparator);
             }
@@ -141,11 +148,15 @@ public class SortActionProvider extends ActionProvider implements OnMenuItemClic
         }
     }
 
-    public void setClickListener(final @NonNull Action1<CacheComparator> onClickListener) {
+    public void setClickListener(@NonNull final Action1<CacheComparator> onClickListener) {
         this.onClickListener = onClickListener;
     }
 
     public void setSelection(final CacheComparator selection) {
         this.selection = selection;
+    }
+
+    public void setIsEventsOnly(final boolean isEventsOnly) {
+        this.isEventsOnly = isEventsOnly;
     }
 }

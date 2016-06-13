@@ -1,5 +1,7 @@
 package cgeo.geocaching;
 
+import butterknife.ButterKnife;
+
 import cgeo.geocaching.activity.AbstractActionBarActivity;
 import cgeo.geocaching.activity.ActivityMixin;
 import cgeo.geocaching.activity.Keyboard;
@@ -8,6 +10,8 @@ import cgeo.geocaching.connector.gc.GCConnector;
 import cgeo.geocaching.connector.gc.GCSmiliesProvider;
 import cgeo.geocaching.connector.gc.GCSmiliesProvider.Smiley;
 import cgeo.geocaching.connector.trackable.TravelBugConnector;
+import cgeo.geocaching.models.Geocache;
+import cgeo.geocaching.models.Trackable;
 import cgeo.geocaching.utils.LogTemplateProvider;
 import cgeo.geocaching.utils.LogTemplateProvider.LogContext;
 import cgeo.geocaching.utils.LogTemplateProvider.LogTemplate;
@@ -86,12 +90,12 @@ public abstract class AbstractLoggingActivity extends AbstractActionBarActivity 
     protected abstract LogContext getLogContext();
 
     protected final void insertIntoLog(final String newText, final boolean moveCursor) {
-        final EditText log = (EditText) findViewById(R.id.log);
+        final EditText log = ButterKnife.findById(this, R.id.log);
         ActivityMixin.insertAtPosition(log, newText, moveCursor);
     }
 
     private void replaceLog(final String newText) {
-        final EditText log = (EditText) findViewById(R.id.log);
+        final EditText log = ButterKnife.findById(this, R.id.log);
         log.setText(StringUtils.EMPTY);
         insertIntoLog(newText, true);
     }

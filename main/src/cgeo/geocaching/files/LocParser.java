@@ -1,14 +1,13 @@
 package cgeo.geocaching.files;
 
-import cgeo.geocaching.Geocache;
-import cgeo.geocaching.SearchResult;
 import cgeo.geocaching.enumerations.CacheSize;
 import cgeo.geocaching.enumerations.CacheType;
 import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.utils.CancellableHandler;
+import cgeo.geocaching.utils.Charsets;
 import cgeo.geocaching.utils.Log;
 
-import org.apache.commons.io.Charsets;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -23,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -52,16 +50,9 @@ public final class LocParser extends FileParser {
 
     private final int listId;
 
-    public static void parseLoc(final SearchResult searchResult, final String fileContent, final Set<Geocache> caches) {
+    public static void parseLoc(final String fileContent, final Set<Geocache> caches) {
         final Map<String, Geocache> cidCoords = parseLoc(fileContent);
 
-        // save found cache coordinates
-        final HashSet<String> contained = new HashSet<>();
-        for (final String geocode : searchResult.getGeocodes()) {
-            if (cidCoords.containsKey(geocode)) {
-                contained.add(geocode);
-            }
-        }
         for (final Geocache cache : caches) {
             if (!cache.isReliableLatLon()) {
                 final Geocache coord = cidCoords.get(cache.getGeocode());
@@ -103,8 +94,8 @@ public final class LocParser extends FileParser {
                             }
                             break;
                         case "coord":
-                            currentCache.setCoords(new Geopoint(Double.valueOf(xpp.getAttributeValue(null, "lat")),
-                                    Double.valueOf(xpp.getAttributeValue(null, "lon"))));
+                            currentCache.setCoords(new Geopoint(Double.parseDouble(xpp.getAttributeValue(null, "lat")),
+                                    Double.parseDouble(xpp.getAttributeValue(null, "lon"))));
                             currentCache.setReliableLatLon(true);
                             break;
                         case "container":
@@ -114,12 +105,12 @@ public final class LocParser extends FileParser {
                             break;
                         case "difficulty":
                             if (xpp.next() == XmlPullParser.TEXT) {
-                                currentCache.setDifficulty(Float.valueOf(xpp.getText()));
+                                currentCache.setDifficulty(Float.parseFloat(xpp.getText()));
                             }
                             break;
                         case "terrain":
                             if (xpp.next() == XmlPullParser.TEXT) {
-                                currentCache.setTerrain(Float.valueOf(xpp.getText()));
+                                currentCache.setTerrain(Float.parseFloat(xpp.getText()));
                             }
                             break;
                         default:
@@ -155,7 +146,7 @@ public final class LocParser extends FileParser {
     public static Geopoint parsePoint(final String latitude, final String longitude) {
         // the loc file contains the coordinates as plain floating point values, therefore avoid using the GeopointParser
         try {
-            return new Geopoint(Double.valueOf(latitude), Double.valueOf(longitude));
+            return new Geopoint(Double.parseDouble(latitude), Double.parseDouble(longitude));
         } catch (final NumberFormatException e) {
             Log.e("LOC format has changed", e);
         }
@@ -182,9 +173,9 @@ public final class LocParser extends FileParser {
 
             fixCache(cache);
             cache.setType(CacheType.UNKNOWN); // type is not given in the LOC file
-            cache.setListId(listId);
+            cache.getLists().add(listId);
             cache.setDetailed(true);
-            cache.store(null);
+            cache.store();
             if (progressHandler != null) {
                 progressHandler.sendMessage(progressHandler.obtainMessage(0, maxSize * caches.size() / coords.size(), 0));
             }

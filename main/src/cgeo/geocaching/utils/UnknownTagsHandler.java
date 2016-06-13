@@ -1,5 +1,8 @@
 package cgeo.geocaching.utils;
 
+import cgeo.geocaching.CgeoApplication;
+import cgeo.geocaching.R;
+
 import org.xml.sax.XMLReader;
 
 import android.text.Editable;
@@ -22,34 +25,34 @@ public class UnknownTagsHandler implements TagHandler {
     private ListType listType = ListType.Unordered;
 
     @Override
-    public void handleTag(boolean opening, String tag, Editable output,
-            XMLReader xmlReader) {
-        if (tag.equalsIgnoreCase("strike") || tag.equals("s")) {
+    public void handleTag(final boolean opening, final String tag, final Editable output,
+            final XMLReader xmlReader) {
+        if ("strike".equalsIgnoreCase(tag) || "s".equals(tag)) {
             handleStrike(opening, output);
-        } else if (tag.equalsIgnoreCase("table")) {
+        } else if ("table".equalsIgnoreCase(tag)) {
             handleProblematic();
-        } else if (tag.equalsIgnoreCase("td")) {
+        } else if ("td".equalsIgnoreCase(tag)) {
             handleTd(opening, output);
-        } else if (tag.equalsIgnoreCase("tr")) {
+        } else if ("tr".equalsIgnoreCase(tag)) {
             handleTr(opening, output);
-        } else if (tag.equalsIgnoreCase("pre")) {
+        } else if ("pre".equalsIgnoreCase(tag)) {
             handleProblematic();
-        } else if (tag.equalsIgnoreCase("ol")) {
+        } else if ("ol".equalsIgnoreCase(tag)) {
             handleOl(opening);
-        } else if (tag.equalsIgnoreCase("li")) {
+        } else if ("li".equalsIgnoreCase(tag)) {
             handleLi(opening, output);
+        } else if ("hr".equalsIgnoreCase(tag)) {
+            handleHr(opening, output);
         }
     }
 
-    private void handleStrike(boolean opening, Editable output) {
+    private void handleStrike(final boolean opening, final Editable output) {
         final int length = output.length();
         if (opening) {
             strikePos = length;
-        } else {
-            if (strikePos > UNDEFINED_POSITION) {
-                output.setSpan(new StrikethroughSpan(), strikePos, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                strikePos = UNDEFINED_POSITION;
-            }
+        } else if (strikePos > UNDEFINED_POSITION) {
+            output.setSpan(new StrikethroughSpan(), strikePos, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            strikePos = UNDEFINED_POSITION;
         }
     }
 
@@ -61,16 +64,14 @@ public class UnknownTagsHandler implements TagHandler {
         problematicDetected = true;
     }
 
-    private void handleTd(boolean opening, Editable output) {
+    private void handleTd(final boolean opening, final Editable output) {
         // insert bar for each table column, see https://en.wikipedia.org/wiki/Box-drawing_characters
-        if (opening) {
-            if (countCells++ > 0) {
-                output.append('┆');
-            }
+        if (opening && countCells++ > 0) {
+            output.append(CgeoApplication.getInstance().getString(R.string.triple_dash_vertical));
         }
     }
 
-    private void handleTr(boolean opening, Editable output) {
+    private void handleTr(final boolean opening, final Editable output) {
         // insert new line for each table row
         if (opening) {
             output.append('\n');
@@ -80,7 +81,7 @@ public class UnknownTagsHandler implements TagHandler {
 
     // Ordered lists are handled in a simple manner. They are rendered as Arabic numbers starting at 1
     // with no handling for alpha or Roman numbers or arbitrary numbering.
-    private void handleOl(boolean opening) {
+    private void handleOl(final boolean opening) {
         if (opening) {
             listIndex = 1;
             listType = ListType.Ordered;
@@ -89,13 +90,26 @@ public class UnknownTagsHandler implements TagHandler {
         }
     }
 
-    private void handleLi(boolean opening, Editable output) {
+    private void handleLi(final boolean opening, final Editable output) {
         if (opening) {
             if (listType == ListType.Ordered) {
                 output.append("\n  ").append(String.valueOf(listIndex++)).append(". ");
             } else {
                 output.append("\n  • ");
             }
+        }
+    }
+
+    private static void handleHr(final boolean opening, final Editable output) {
+        if (opening) {
+            // If we are in the middle of a line, add a line feed.
+            if (output.length() > 0 && output.charAt(output.length() - 1) != '\n') {
+                output.append('\n');
+            }
+            final int start = output.length();
+            output.append("                              ");
+            output.setSpan(new StrikethroughSpan(), start, output.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            output.append("\n");
         }
     }
 

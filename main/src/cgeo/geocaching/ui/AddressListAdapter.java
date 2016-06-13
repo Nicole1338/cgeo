@@ -1,16 +1,5 @@
 package cgeo.geocaching.ui;
 
-import butterknife.InjectView;
-
-import cgeo.geocaching.CacheListActivity;
-import cgeo.geocaching.R;
-import cgeo.geocaching.location.Geopoint;
-import cgeo.geocaching.location.Units;
-import cgeo.geocaching.sensors.Sensors;
-
-import org.apache.commons.lang3.StringUtils;
-import org.eclipse.jdt.annotation.NonNull;
-
 import android.app.Activity;
 import android.location.Address;
 import android.view.LayoutInflater;
@@ -19,16 +8,27 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
+import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
+
 import java.util.ArrayList;
+import java.util.List;
+
+import butterknife.BindView;
+import cgeo.geocaching.CacheListActivity;
+import cgeo.geocaching.R;
+import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.location.Units;
+import cgeo.geocaching.sensors.Sensors;
 
 public class AddressListAdapter extends ArrayAdapter<Address> {
 
-    final private LayoutInflater inflater;
-    @NonNull final private Geopoint location;
+    private final LayoutInflater inflater;
+    @NonNull private final Geopoint location;
 
     protected static final class ViewHolder extends AbstractViewHolder {
-        @InjectView(R.id.label) protected TextView label;
-        @InjectView(R.id.distance) protected TextView distance;
+        @BindView(R.id.label) TextView label;
+        @BindView(R.id.distance) TextView distance;
 
         public ViewHolder(final View view) {
             super(view);
@@ -82,7 +82,7 @@ public class AddressListAdapter extends ArrayAdapter<Address> {
 
     private static CharSequence getAddressText(final Address address) {
         final int maxIndex = address.getMaxAddressLineIndex();
-        final ArrayList<String> lines = new ArrayList<>();
+        final List<String> lines = new ArrayList<>();
         for (int i = 0; i <= maxIndex; i++) {
             final String line = address.getAddressLine(i);
             if (StringUtils.isNotBlank(line)) {

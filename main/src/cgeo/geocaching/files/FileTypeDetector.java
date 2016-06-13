@@ -25,51 +25,54 @@ public class FileTypeDetector {
         this.contentResolver = contentResolver;
     }
 
-	public @NonNull FileType getFileType() {
+    @NonNull
+    public FileType getFileType() {
         InputStream is = null;
         BufferedReader reader = null;
-		FileType type = FileType.UNKNOWN;
-		try {
+        FileType type = FileType.UNKNOWN;
+        try {
             is = contentResolver.openInputStream(uri);
             if (is == null) {
                 return FileType.UNKNOWN;
             }
             reader = new BufferedReader(new InputStreamReader(is, CharEncoding.UTF_8));
-			type = detectHeader(reader);
+            type = detectHeader(reader);
             reader.close();
         } catch (final IOException e) {
-			Log.e("FileTypeDetector", e);
+            if (!uri.toString().startsWith("http")) {
+                Log.e("FileTypeDetector", e);
+            }
         } finally {
             IOUtils.closeQuietly(reader);
             IOUtils.closeQuietly(is);
         }
-		return type;
+        return type;
     }
 
-	private static FileType detectHeader(final BufferedReader reader)
-			throws IOException {
-		String line = reader.readLine();
-		if (isZip(line)) {
-			return FileType.ZIP;
-		}
-		// scan at most 5 lines of a GPX file
-		for (int i = 0; i < 5; i++) {
-			line = StringUtils.trim(line);
-			if (StringUtils.contains(line, "<loc")) {
-				return FileType.LOC;
-			}
-			if (StringUtils.contains(line, "<gpx")) {
-				return FileType.GPX;
-			}
-			line = reader.readLine();
-		}
-		return FileType.UNKNOWN;
-	}
+    private static FileType detectHeader(final BufferedReader reader)
+            throws IOException {
+        String line = reader.readLine();
+        if (isZip(line)) {
+            return FileType.ZIP;
+        }
+        // scan at most 5 lines of a GPX file
+        for (int i = 0; i < 5; i++) {
+            line = StringUtils.trim(line);
+            if (StringUtils.contains(line, "<loc")) {
+                return FileType.LOC;
+            }
+            if (StringUtils.contains(line, "<gpx")) {
+                return FileType.GPX;
+            }
+            line = reader.readLine();
+        }
+        return FileType.UNKNOWN;
+    }
 
-	private static boolean isZip(final String line) {
-		return StringUtils.length(line) >= 4
-				&& StringUtils.startsWith(line, "PK") && line.charAt(2) == 3
-				&& line.charAt(3) == 4;
-	}
+    private static boolean isZip(final String line) {
+        return StringUtils.length(line) >= 4
+                && StringUtils.startsWith(line, "PK") && line.charAt(2) == 3
+                && line.charAt(3) == 4;
+    }
 
 }

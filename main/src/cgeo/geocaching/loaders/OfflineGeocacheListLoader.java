@@ -1,6 +1,6 @@
 package cgeo.geocaching.loaders;
 
-import cgeo.geocaching.DataStore;
+import cgeo.geocaching.storage.DataStore;
 import cgeo.geocaching.Intents;
 import cgeo.geocaching.SearchResult;
 import cgeo.geocaching.location.Geopoint;
@@ -26,7 +26,6 @@ public class OfflineGeocacheListLoader extends AbstractSearchLoader {
     }
 
     /**
-     * @param listId
      * @return the bundle needed for querying the LoaderManager for the offline list with the given id
      */
     public static Bundle getBundleForList(final int listId) {

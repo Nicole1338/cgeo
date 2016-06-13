@@ -1,15 +1,19 @@
 package cgeo.geocaching.connector.oc;
 
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.SearchResult;
 import cgeo.geocaching.connector.capability.ISearchByGeocode;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.network.Parameters;
+import cgeo.geocaching.utils.AndroidRxUtils;
 import cgeo.geocaching.utils.CancellableHandler;
 import cgeo.geocaching.utils.CryptUtils;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+
+import rx.Observable;
+import rx.functions.Func0;
 
 public class OCApiConnector extends OCConnector implements ISearchByGeocode {
 
@@ -23,6 +27,7 @@ public class OCApiConnector extends OCConnector implements ISearchByGeocode {
 
     // Levels of OAuth-Authentication we support
     public enum OAuthLevel {
+        Level0,
         Level1,
         Level3
     }
@@ -31,7 +36,7 @@ public class OCApiConnector extends OCConnector implements ISearchByGeocode {
     private final ApiSupport apiSupport;
     private final String licenseString;
 
-    public OCApiConnector(final String name, final String host, final String prefix, final String cK, final String licenseString, final ApiSupport apiSupport) {
+    public OCApiConnector(@NonNull final String name, @NonNull final String host, final String prefix, final String cK, final String licenseString, final ApiSupport apiSupport) {
         super(name, host, prefix);
         this.cK = cK;
         this.apiSupport = apiSupport;
@@ -39,23 +44,26 @@ public class OCApiConnector extends OCConnector implements ISearchByGeocode {
     }
 
     public void addAuthentication(final Parameters params) {
+        if (StringUtils.isBlank(cK)) {
+            throw new IllegalStateException("empty OKAPI OAuth token for host " + getHost() + ". fix your keys.xml");
+        }
         final String rotCK = CryptUtils.rot13(cK);
         // check that developers are not using the Ant defined properties without any values
         if (StringUtils.startsWith(rotCK, "${")) {
-            throw new IllegalStateException("invalid OKAPI OAuth token " + rotCK);
+            throw new IllegalStateException("invalid OKAPI OAuth token '" + rotCK + "' for host " + getHost() + ". fix your keys.xml");
         }
         params.put(CryptUtils.rot13("pbafhzre_xrl"), rotCK);
     }
 
     @Override
     @NonNull
-    public String getLicenseText(final @NonNull Geocache cache) {
+    public String getLicenseText(@NonNull final Geocache cache) {
         // NOT TO BE TRANSLATED
         return "© " + cache.getOwnerDisplayName() + ", <a href=\"" + getCacheUrl(cache) + "\">" + getName() + "</a>, " + licenseString;
     }
 
     @Override
-    public SearchResult searchByGeocode(final @Nullable String geocode, final @Nullable String guid, final CancellableHandler handler) {
+    public SearchResult searchByGeocode(@Nullable final String geocode, @Nullable final String guid, final CancellableHandler handler) {
         final Geocache cache = OkapiClient.getCache(geocode);
         if (cache == null) {
             return null;
@@ -108,4 +116,46 @@ public class OCApiConnector extends OCConnector implements ISearchByGeocode {
     public boolean isSearchForMyCaches(final String username) {
         return false;
     }
+
+    @Override
+    @Nullable
+    public String getGeocodeFromUrl(@NonNull final String url) {
+        final String shortHost = StringUtils.remove(getHost(), "www.");
+
+        // host.tld/viewcache.php?cacheid
+        final String id = StringUtils.trim(StringUtils.substringAfter(url, shortHost + "/viewcache.php?cacheid="));
+        if (StringUtils.isNotBlank(id)) {
+
+            final String geocode = Observable.defer(new Func0<Observable<String>>() {
+                @Override
+                public Observable<String> call() {
+                    return Observable.just(OkapiClient.getGeocodeByUrl(OCApiConnector.this, url));
+                }
+            }).subscribeOn(AndroidRxUtils.networkScheduler).toBlocking().first();
+
+            if (geocode != null && canHandle(geocode)) {
+                return geocode;
+            }
+        }
+
+        return super.getGeocodeFromUrl(url);
+    }
+
+    @Override
+    @Nullable
+    public String getCreateAccountUrl() {
+        // mobile
+        String url = OkapiClient.getMobileRegistrationUrl(this);
+        if (StringUtils.isNotBlank(url)) {
+            return url;
+        }
+        // non-mobile
+        url = OkapiClient.getRegistrationUrl(this);
+        if (StringUtils.isNotBlank(url)) {
+            return url;
+        }
+        // fall back to a simple host name based pattern
+        return super.getCreateAccountUrl();
+    }
+
 }

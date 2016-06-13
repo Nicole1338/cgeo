@@ -1,9 +1,9 @@
 package cgeo.geocaching.ui.logs;
 
 import cgeo.geocaching.ImagesActivity;
-import cgeo.geocaching.LogEntry;
 import cgeo.geocaching.R;
 import cgeo.geocaching.activity.AbstractActionBarActivity;
+import cgeo.geocaching.models.LogEntry;
 import cgeo.geocaching.network.SmileyImage;
 import cgeo.geocaching.ui.AbstractCachingListViewPageViewCreator;
 import cgeo.geocaching.ui.AnchorAwareLinkMovementMethod;
@@ -46,13 +46,13 @@ public abstract class LogsViewCreator extends AbstractCachingListViewPageViewCre
         view.setAdapter(new ArrayAdapter<LogEntry>(activity, R.layout.logs_item, logs) {
 
             @Override
-            public View getView(final int position, final View convertView, final android.view.ViewGroup parent) {
+            public View getView(final int position, final View convertView, final ViewGroup parent) {
                 View rowView = convertView;
-                if (null == rowView) {
+                if (rowView == null) {
                     rowView = activity.getLayoutInflater().inflate(R.layout.logs_item, parent, false);
                 }
                 LogViewHolder holder = (LogViewHolder) rowView.getTag();
-                if (null == holder) {
+                if (holder == null) {
                     holder = new LogViewHolder(rowView);
                 }
                 holder.setPosition(position);
@@ -68,7 +68,7 @@ public abstract class LogsViewCreator extends AbstractCachingListViewPageViewCre
         return view;
     }
 
-    protected void fillViewHolder(final View convertView, final LogViewHolder holder, final LogEntry log) {
+    protected void fillViewHolder(@SuppressWarnings("unused") final View convertView, final LogViewHolder holder, final LogEntry log) {
         if (log.date > 0) {
             holder.date.setText(Formatter.formatShortDateVerbally(log.date));
             holder.date.setVisibility(View.VISIBLE);
@@ -76,20 +76,17 @@ public abstract class LogsViewCreator extends AbstractCachingListViewPageViewCre
             holder.date.setVisibility(View.GONE);
         }
 
-        holder.type.setText(log.type.getL10n());
+        holder.type.setText(log.getType().getL10n());
         holder.author.setText(StringEscapeUtils.unescapeHtml4(log.author));
 
         fillCountOrLocation(holder, log);
 
         // log text, avoid parsing HTML if not necessary
-        String logText = log.log;
-        if (TextUtils.containsHtml(logText)) {
-            logText = log.getDisplayText();
+        if (TextUtils.containsHtml(log.log)) {
             final UnknownTagsHandler unknownTagsHandler = new UnknownTagsHandler();
-            holder.text.setText(Html.fromHtml(logText, new SmileyImage(getGeocode(), holder.text),
-                    unknownTagsHandler), TextView.BufferType.SPANNABLE);
+            holder.text.setText(TextUtils.trimSpanned(Html.fromHtml(log.getDisplayText(), new SmileyImage(getGeocode(), holder.text), unknownTagsHandler)), TextView.BufferType.SPANNABLE);
         } else {
-            holder.text.setText(logText, TextView.BufferType.SPANNABLE);
+            holder.text.setText(log.log, TextView.BufferType.SPANNABLE);
         }
 
         // images
@@ -107,33 +104,30 @@ public abstract class LogsViewCreator extends AbstractCachingListViewPageViewCre
         }
 
         // colored marker
-        final int marker = log.type.markerId;
+        final int marker = log.getType().markerId;
         if (marker != 0) {
             holder.marker.setVisibility(View.VISIBLE);
             holder.marker.setImageResource(marker);
-        }
-        else {
+        } else {
             holder.marker.setVisibility(View.GONE);
         }
 
-        if (null == convertView) {
-            holder.author.setOnClickListener(createUserActionsListener());
-            holder.text.setMovementMethod(AnchorAwareLinkMovementMethod.getInstance());
-            holder.text.setOnClickListener(new DecryptTextClickListener(holder.text));
-            activity.registerForContextMenu(holder.text);
-        }
+        holder.author.setOnClickListener(createUserActionsListener());
+        holder.text.setMovementMethod(AnchorAwareLinkMovementMethod.getInstance());
+        holder.text.setOnClickListener(new DecryptTextClickListener(holder.text));
+        activity.registerForContextMenu(holder.text);
     }
 
-    abstract protected UserActionsClickListener createUserActionsListener();
+    protected abstract UserActionsClickListener createUserActionsListener();
 
-    abstract protected String getGeocode();
+    protected abstract String getGeocode();
 
-    abstract protected List<LogEntry> getLogs();
+    protected abstract List<LogEntry> getLogs();
 
-    abstract protected void addHeaderView();
+    protected abstract void addHeaderView();
 
-    abstract protected void fillCountOrLocation(LogViewHolder holder, final LogEntry log);
+    protected abstract void fillCountOrLocation(LogViewHolder holder, final LogEntry log);
 
-    abstract protected boolean isValid();
+    protected abstract boolean isValid();
 
 }

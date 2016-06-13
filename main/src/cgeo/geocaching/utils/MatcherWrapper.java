@@ -1,11 +1,12 @@
 package cgeo.geocaching.utils;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
 import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Wrapper around the regex {@link Matcher} class. This implementation optimizes the memory usage of the matched
@@ -45,9 +46,8 @@ public class MatcherWrapper {
      * <p>
      * Do not change this method, even if Findbugs and other tools will report a violation for that line!
      *
-     * @param input
-     * @return
      */
+    @Nullable
     @SuppressFBWarnings("DM_STRING_CTOR")
     private static String newString(final String input) {
         if (input == null) {

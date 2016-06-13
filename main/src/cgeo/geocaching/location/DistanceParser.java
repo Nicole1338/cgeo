@@ -11,6 +11,10 @@ public final class DistanceParser {
 
     private static final Pattern pattern = Pattern.compile("^([0-9.,]+)[ ]*(m|km|ft|yd|mi|)?$", Pattern.CASE_INSENSITIVE);
 
+    private DistanceParser() {
+        // utility class
+    }
+
     /**
      * Parse a distance string composed by a number and an optional suffix
      * (such as "1.2km").
@@ -22,7 +26,7 @@ public final class DistanceParser {
      * @throws NumberFormatException
      *             if the given number is invalid
      */
-    public static float parseDistance(String distanceText, final boolean metricUnit)
+    public static float parseDistance(final String distanceText, final boolean metricUnit)
             throws NumberFormatException {
         final MatcherWrapper matcher = new MatcherWrapper(pattern, distanceText);
 
@@ -31,18 +35,18 @@ public final class DistanceParser {
         }
 
         final float value = Float.parseFloat(matcher.group(1).replace(',', '.'));
-        final String unit = matcher.group(2).toLowerCase(Locale.US);
+        final String unit = StringUtils.lowerCase(matcher.group(2), Locale.US);
 
-        if (unit.equals("m") || (StringUtils.isEmpty(unit) && metricUnit)) {
+        if ("m".equals(unit) || (StringUtils.isEmpty(unit) && metricUnit)) {
             return value / 1000;
         }
-        if (unit.equals("km")) {
+        if ("km".equals(unit)) {
             return value;
         }
-        if (unit.equals("yd")) {
+        if ("yd".equals(unit)) {
             return value * IConversion.YARDS_TO_KILOMETER;
         }
-        if (unit.equals("mi")) {
+        if ("mi".equals(unit)) {
             return value * IConversion.MILES_TO_KILOMETER;
         }
         return value * IConversion.FEET_TO_KILOMETER;

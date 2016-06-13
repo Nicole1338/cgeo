@@ -1,12 +1,11 @@
 package cgeo.geocaching;
 
 import cgeo.geocaching.activity.AbstractActionBarActivity;
-import cgeo.geocaching.settings.Settings;
+import cgeo.geocaching.models.Image;
 import cgeo.geocaching.ui.ImagesList;
 import cgeo.geocaching.ui.ImagesList.ImageType;
 
 import org.apache.commons.collections4.CollectionUtils;
-
 import rx.Subscription;
 
 import android.content.Context;
@@ -22,8 +21,7 @@ import java.util.List;
 
 public class ImagesActivity extends AbstractActionBarActivity {
 
-    private boolean offline;
-    private ArrayList<Image> imageNames;
+    private List<Image> imageNames;
     private ImageType imgType = ImageType.SpoilerImages;
     private ImagesList imagesList;
     private Subscription subscription;
@@ -52,24 +50,19 @@ public class ImagesActivity extends AbstractActionBarActivity {
         setContentView(R.layout.images_activity);
         setTitle(res.getString(imgType.getTitle()));
 
-        imagesList = new ImagesList(this, geocode);
+        imagesList = new ImagesList(this, geocode, null);
 
         imageNames = extras.getParcelableArrayList(Intents.EXTRA_IMAGES);
         if (CollectionUtils.isEmpty(imageNames)) {
             showToast(res.getString(R.string.warn_load_images));
             finish();
-            return;
         }
-
-        offline = DataStore.isOffline(geocode, null) && (imgType == ImageType.SpoilerImages
-                || Settings.isStoreLogImages());
-
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        subscription = imagesList.loadImages(findViewById(R.id.spoiler_list), imageNames, offline);
+        subscription = imagesList.loadImages(findViewById(R.id.spoiler_list), imageNames);
     }
 
     @Override
@@ -83,11 +76,8 @@ public class ImagesActivity extends AbstractActionBarActivity {
         startActivity(fromActivity, geocode, logImages, ImageType.LogImages);
     }
 
-    @SuppressWarnings("deprecation")
     private static void startActivity(final Context fromActivity, final String geocode, final List<Image> logImages, final ImageType imageType) {
-        final Intent logImgIntent = new Intent(fromActivity, ImagesActivity.class);
-        // if resuming our app within this activity, finish it and return to the cache activity
-        logImgIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET)
+        final Intent logImgIntent = new Intent(fromActivity, ImagesActivity.class)
                 .putExtra(Intents.EXTRA_GEOCODE, geocode)
                 .putExtra(Intents.EXTRA_TYPE, imageType);
 

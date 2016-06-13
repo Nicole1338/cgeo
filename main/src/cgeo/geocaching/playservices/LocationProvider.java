@@ -2,15 +2,15 @@ package cgeo.geocaching.playservices;
 
 import cgeo.geocaching.sensors.GeoData;
 import cgeo.geocaching.settings.Settings;
+import cgeo.geocaching.utils.AndroidRxUtils;
 import cgeo.geocaching.utils.Log;
-import cgeo.geocaching.utils.RxUtils;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-
 import rx.Observable;
 import rx.Observable.OnSubscribe;
 import rx.Subscriber;
@@ -23,11 +23,12 @@ import rx.subscriptions.Subscriptions;
 import android.content.Context;
 import android.location.Location;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class LocationProvider implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class LocationProvider extends LocationCallback implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private static final LocationRequest LOCATION_REQUEST =
             LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY).setInterval(2000).setFastestInterval(250);
@@ -50,10 +51,10 @@ public class LocationProvider implements GoogleApiClient.ConnectionCallbacks, Go
         if (locationClient.isConnected()) {
             if (mostPreciseCount.get() > 0) {
                 Log.d("LocationProvider: requesting most precise locations");
-                LocationServices.FusedLocationApi.requestLocationUpdates(locationClient, LOCATION_REQUEST, this, RxUtils.looperCallbacksLooper);
+                LocationServices.FusedLocationApi.requestLocationUpdates(locationClient, LOCATION_REQUEST, this, AndroidRxUtils.looperCallbacksLooper);
             } else if (lowPowerCount.get() > 0) {
                 Log.d("LocationProvider: requesting low-power locations");
-                LocationServices.FusedLocationApi.requestLocationUpdates(locationClient, LOCATION_REQUEST_LOW_POWER, this, RxUtils.looperCallbacksLooper);
+                LocationServices.FusedLocationApi.requestLocationUpdates(locationClient, LOCATION_REQUEST_LOW_POWER, this, AndroidRxUtils.looperCallbacksLooper);
             } else {
                 Log.d("LocationProvider: stopping location requests");
                 LocationServices.FusedLocationApi.removeLocationUpdates(locationClient, this);
@@ -72,7 +73,7 @@ public class LocationProvider implements GoogleApiClient.ConnectionCallbacks, Go
                 subscriber.add(Subscriptions.create(new Action0() {
                     @Override
                     public void call() {
-                        RxUtils.looperCallbacksWorker.schedule(new Action0() {
+                        AndroidRxUtils.looperCallbacksWorker.schedule(new Action0() {
                             @Override
                             public void call() {
                                 if (reference.decrementAndGet() == 0) {
@@ -88,7 +89,7 @@ public class LocationProvider implements GoogleApiClient.ConnectionCallbacks, Go
     }
 
     public static Observable<GeoData> getMostPrecise(final Context context) {
-        return get(context, mostPreciseCount).onBackpressureDrop();
+        return get(context, mostPreciseCount).onBackpressureLatest();
     }
 
     public static Observable<GeoData> getLowPower(final Context context) {
@@ -102,17 +103,17 @@ public class LocationProvider implements GoogleApiClient.ConnectionCallbacks, Go
         // no less precise than 20 meters.
         final Observable<GeoData> untilPreciseEnoughObservable =
                 lowPowerObservable.mergeWith(highPowerObservable.delaySubscription(6, TimeUnit.SECONDS))
-                        .lift(RxUtils.operatorTakeUntil(new Func1<GeoData, Boolean>() {
+                        .takeUntil(new Func1<GeoData, Boolean>() {
                             @Override
                             public Boolean call(final GeoData geoData) {
                                 return geoData.getAccuracy() <= 20;
                             }
-                        }));
+                        });
 
         // After sending the last known location, try to get a precise location then use the low-power mode. If no
         // location information is given for 25 seconds (if the network location is turned off for example), get
         // back to the precise location and try again.
-        return subject.first().concatWith(untilPreciseEnoughObservable.concatWith(lowPowerObservable).timeout(25, TimeUnit.SECONDS).retry()).onBackpressureDrop();
+        return subject.first().concatWith(untilPreciseEnoughObservable.concatWith(lowPowerObservable).timeout(25, TimeUnit.SECONDS).retry()).onBackpressureLatest();
     }
 
     /**
@@ -140,13 +141,14 @@ public class LocationProvider implements GoogleApiClient.ConnectionCallbacks, Go
     }
 
     @Override
-    public void onConnectionFailed(final ConnectionResult connectionResult) {
+    public void onConnectionFailed(@NonNull final ConnectionResult connectionResult) {
         Log.e("cannot connect to Google Play location service: " + connectionResult);
         subject.onError(new RuntimeException("Connection failed: " + connectionResult));
     }
 
     @Override
-    public void onLocationChanged(final Location location) {
+    public void onLocationResult(final LocationResult result) {
+        final Location location = result.getLastLocation();
         if (Settings.useLowPowerMode()) {
             location.setProvider(GeoData.LOW_POWER_PROVIDER);
         }

@@ -1,6 +1,6 @@
 package cgeo.geocaching.connector;
 
-import cgeo.geocaching.TrackableLog;
+import cgeo.geocaching.models.TrackableLog;
 
 import org.eclipse.jdt.annotation.NonNull;
 
@@ -20,4 +20,8 @@ public abstract class AbstractLoggingManager implements ILoggingManager {
         return Collections.emptyList();
     }
 
+    @Override
+    public int getPremFavoritePoints() {
+        return 0;
+    }
 }

@@ -1,12 +1,12 @@
 package cgeo.geocaching.sorting;
 
-import cgeo.geocaching.Geocache;
+import cgeo.geocaching.models.Geocache;
 
 /**
  * sorts caches by geo code, therefore effectively sorting by cache age
  *
  */
-class GeocodeComparator extends AbstractCacheComparator {
+public class GeocodeComparator extends AbstractCacheComparator {
 
     @Override
     protected boolean canCompare(final Geocache cache) {
@@ -16,6 +16,6 @@ class GeocodeComparator extends AbstractCacheComparator {
 
     @Override
     protected int compareCaches(final Geocache cache1, final Geocache cache2) {
-        throw new RuntimeException("should never be called");
+        throw new IllegalStateException("should never be called");
     }
 }

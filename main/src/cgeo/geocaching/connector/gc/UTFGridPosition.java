@@ -12,7 +12,7 @@ final class UTFGridPosition {
 
     final int x;
     final int y;
-    private final static Pattern PATTERN_JSON_KEY = Pattern.compile("[^\\d]*" + "(\\d+),\\s*(\\d+)" + "[^\\d]*"); // (12, 34)
+    private static final Pattern PATTERN_JSON_KEY = Pattern.compile("[^\\d]*" + "(\\d+),\\s*(\\d+)" + "[^\\d]*"); // (12, 34)
 
     UTFGridPosition(final int x, final int y) {
         if (x < 0 || x > UTFGrid.GRID_MAXX) {
@@ -36,10 +36,9 @@ final class UTFGridPosition {
     /**
      * @param key
      *            Key in the format (xx, xx)
-     * @return
      */
     static UTFGridPosition fromString(final String key) {
-        final MatcherWrapper matcher = new MatcherWrapper(UTFGridPosition.PATTERN_JSON_KEY, key);
+        final MatcherWrapper matcher = new MatcherWrapper(PATTERN_JSON_KEY, key);
         try {
             if (matcher.matches()) {
                 final int x = Integer.parseInt(matcher.group(1));

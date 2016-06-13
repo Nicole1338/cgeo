@@ -15,13 +15,23 @@ import android.app.Activity;
 import android.content.Intent;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 public class GpxFileListActivity extends AbstractFileListActivity<GPXListAdapter> {
 
     public GpxFileListActivity() {
-        super(new String[] { "gpx", "loc", "zip" });
+        super(supportedFileTypes());
+    }
+
+    private static String[] supportedFileTypes() {
+        final ArrayList<String> result = new ArrayList<>();
+        for (final String dotExtension : Arrays.asList(GPXImporter.GPX_FILE_EXTENSION, GPXImporter.LOC_FILE_EXTENSION, GPXImporter.COMPRESSED_GPX_FILE_EXTENSION, GPXImporter.ZIP_FILE_EXTENSION)) {
+            result.add(StringUtils.substringAfter(dotExtension, "."));
+        }
+        return result.toArray(new String[result.size()]);
     }
 
     @Override
@@ -34,10 +44,10 @@ public class GpxFileListActivity extends AbstractFileListActivity<GPXListAdapter
         return Collections.singletonList(new File(Settings.getGpxImportDir()));
     }
 
-    public static void startSubActivity(final Activity fromActivity, final int listId) {
+    public static void startSubActivity(final Activity fromActivity, final int listId, final int requestCode) {
         final Intent intent = new Intent(fromActivity, GpxFileListActivity.class);
         intent.putExtra(Intents.EXTRA_LIST_ID, StoredList.getConcreteList(listId));
-        fromActivity.startActivityForResult(intent, 0);
+        fromActivity.startActivityForResult(intent, requestCode);
     }
 
     @Override

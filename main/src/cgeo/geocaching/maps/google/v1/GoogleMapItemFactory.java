@@ -1,6 +1,6 @@
 package cgeo.geocaching.maps.google.v1;
 
-import cgeo.geocaching.IWaypoint;
+import cgeo.geocaching.models.IWaypoint;
 import cgeo.geocaching.location.Geopoint;
 import cgeo.geocaching.maps.interfaces.CachesOverlayItemImpl;
 import cgeo.geocaching.maps.interfaces.GeoPointImpl;
@@ -14,7 +14,7 @@ public class GoogleMapItemFactory implements MapItemFactory {
     }
 
     @Override
-    public CachesOverlayItemImpl getCachesOverlayItem(final IWaypoint coordinate, boolean applyDistanceRule) {
+    public CachesOverlayItemImpl getCachesOverlayItem(final IWaypoint coordinate, final boolean applyDistanceRule) {
         return new GoogleCacheOverlayItem(coordinate, applyDistanceRule);
     }
 }

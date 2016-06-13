@@ -1,22 +1,21 @@
 package cgeo.geocaching.ui.dialog;
 
-import butterknife.ButterKnife;
-
-import cgeo.geocaching.R;
-
+import android.annotation.TargetApi;
+import android.app.DatePickerDialog;
+import android.app.DatePickerDialog.OnDateSetListener;
+import android.app.Dialog;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.app.DialogFragment;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.DatePicker;
 
 import java.util.Calendar;
 
-public class DateDialog extends DialogFragment {
+public class DateDialog extends DialogFragment implements OnDateSetListener {
 
     public interface DateDialogParent {
-        abstract public void setDate(final Calendar date);
+        void setDate(final Calendar date);
     }
 
     private Calendar date;
@@ -30,30 +29,33 @@ public class DateDialog extends DialogFragment {
     }
 
     @Override
-    public void onCreate(final Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setStyle(DialogFragment.STYLE_NO_TITLE, 0);
+    @NonNull
+    public Dialog onCreateDialog(final Bundle savedInstanceState) {
         final Bundle args = getArguments();
         date = (Calendar) args.getSerializable("date");
+
+        final int year = date.get(Calendar.YEAR);
+        final int month = date.get(Calendar.MONTH);
+        final int day = date.get(Calendar.DAY_OF_MONTH);
+
+        // Create a new instance of DatePickerDialog and return it
+        final DatePickerDialog dialog = new DatePickerDialog(getActivity(), this, year, month, day);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            forceTitleUpdate(year, month, day, dialog);
+        }
+        return dialog;
+    }
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+    private static void forceTitleUpdate(final int year, final int month, final int day, final DatePickerDialog dialog) {
+        dialog.onDateChanged(dialog.getDatePicker(), year, month, day);
     }
 
     @Override
-    public View onCreateView(final LayoutInflater inflater, final ViewGroup container, final Bundle savedInstanceState) {
-        final View v = inflater.inflate(R.layout.date, container, false);
+    public void onDateSet(final DatePicker view, final int year, final int monthOfYear, final int dayOfMonth) {
+        date.set(year, monthOfYear, dayOfMonth);
 
-        final DatePicker picker = ButterKnife.findById(v, R.id.picker);
-        picker.init(date.get(Calendar.YEAR), date.get(Calendar.MONTH), date.get(Calendar.DATE), new DatePickerListener());
-        return v;
-    }
-
-    private class DatePickerListener implements DatePicker.OnDateChangedListener {
-
-        @Override
-        public void onDateChanged(final DatePicker picker, final int year, final int month, final int day) {
-            date.set(year, month, day);
-
-            ((DateDialogParent) getActivity()).setDate(date);
-
-        }
+        ((DateDialogParent) getActivity()).setDate(date);
     }
 }

@@ -1,17 +1,30 @@
 package cgeo.geocaching.filter;
 
-import cgeo.geocaching.Geocache;
+import cgeo.geocaching.CgeoApplication;
+import cgeo.geocaching.models.Geocache;
 
 import org.eclipse.jdt.annotation.NonNull;
+
+import android.os.Parcel;
+import android.support.annotation.StringRes;
 
 import java.util.ArrayList;
 import java.util.List;
 
 abstract class AbstractFilter implements IFilter {
+    @NonNull
     private final String name;
 
-    protected AbstractFilter(final String name) {
+    protected AbstractFilter(@StringRes final int nameResourceId) {
+        this(CgeoApplication.getInstance().getString(nameResourceId));
+    }
+
+    protected AbstractFilter(@NonNull final String name) {
         this.name = name;
+    }
+
+    protected AbstractFilter(final Parcel in) {
+        name = in.readString();
     }
 
     @Override
@@ -26,6 +39,7 @@ abstract class AbstractFilter implements IFilter {
     }
 
     @Override
+    @NonNull
     public String getName() {
         return name;
     }
@@ -38,5 +52,15 @@ abstract class AbstractFilter implements IFilter {
     @Override
     public String toString() {
         return getName();
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(final Parcel dest, final int flags) {
+        dest.writeString(name);
     }
 }

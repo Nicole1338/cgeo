@@ -1,13 +1,16 @@
 package cgeo.geocaching.filter;
 
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.Geocache;
 import cgeo.geocaching.R;
 import cgeo.geocaching.location.Geopoint;
+import cgeo.geocaching.models.Geocache;
 import cgeo.geocaching.sensors.GeoData;
 import cgeo.geocaching.sensors.Sensors;
 
 import org.eclipse.jdt.annotation.NonNull;
+
+import android.os.Parcel;
+import android.os.Parcelable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,10 +20,17 @@ class DistanceFilter extends AbstractFilter {
     private final int minDistance;
     private final int maxDistance;
 
-    public DistanceFilter(final String name, final int minDistance, final int maxDistance) {
+    DistanceFilter(@NonNull final String name, final int minDistance, final int maxDistance) {
         super(name);
         this.minDistance = minDistance;
         this.maxDistance = maxDistance;
+        geo = Sensors.getInstance().currentGeo();
+    }
+
+    protected DistanceFilter(final Parcel in) {
+        super(in);
+        minDistance = in.readInt();
+        maxDistance = in.readInt();
         geo = Sensors.getInstance().currentGeo();
     }
 
@@ -50,8 +60,7 @@ class DistanceFilter extends AbstractFilter {
                 final int maxRange;
                 if (i < KILOMETERS.length - 1) {
                     maxRange = KILOMETERS[i + 1];
-                }
-                else {
+                } else {
                     maxRange = Integer.MAX_VALUE;
                 }
                 final String range = maxRange == Integer.MAX_VALUE ? "> " + minRange : minRange + " - " + maxRange;
@@ -60,6 +69,26 @@ class DistanceFilter extends AbstractFilter {
             }
             return filters;
         }
-
     }
+
+    @Override
+    public void writeToParcel(final Parcel dest, final int flags) {
+        super.writeToParcel(dest, flags);
+        dest.writeInt(minDistance);
+        dest.writeInt(maxDistance);
+    }
+
+    public static final Creator<DistanceFilter> CREATOR
+            = new Parcelable.Creator<DistanceFilter>() {
+
+        @Override
+        public DistanceFilter createFromParcel(final Parcel in) {
+            return new DistanceFilter(in);
+        }
+
+        @Override
+        public DistanceFilter[] newArray(final int size) {
+            return new DistanceFilter[size];
+        }
+    };
 }

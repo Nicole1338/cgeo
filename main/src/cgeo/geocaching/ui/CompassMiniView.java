@@ -16,7 +16,7 @@ import android.graphics.PaintFlagsDrawFilter;
 import android.util.AttributeSet;
 import android.view.View;
 
-final public class CompassMiniView extends View {
+public final class CompassMiniView extends View {
     private Geopoint targetCoords = null;
     private float azimuth = 0;
     private float heading = 0;
@@ -50,18 +50,20 @@ final public class CompassMiniView extends View {
     private static final float MINIMUM_ROTATION_DEGREES_FOR_REPAINT = 5;
     private float azimuthRelative;
 
-    public CompassMiniView(Context context) {
+    public CompassMiniView(final Context context) {
         super(context);
     }
 
-    public CompassMiniView(Context context, AttributeSet attrs) {
+    public CompassMiniView(final Context context, final AttributeSet attrs) {
         super(context, attrs);
     }
 
     @Override
     public void onAttachedToWindow() {
+        super.onAttachedToWindow();
         if (instances++ == 0) {
-            compassArrow = BitmapFactory.decodeResource(getResources(), Settings.isLightSkin() ? R.drawable.compass_arrow_mini_black : R.drawable.compass_arrow_mini_white);
+            final int drawable = isInEditMode() || !Settings.isLightSkin() ? R.drawable.compass_arrow_mini_white : R.drawable.compass_arrow_mini_black;
+            compassArrow = BitmapFactory.decodeResource(getResources(), drawable);
             compassArrowWidth = compassArrow.getWidth();
             compassArrowHeight = compassArrow.getWidth();
         }
@@ -79,17 +81,17 @@ final public class CompassMiniView extends View {
         targetCoords = point;
     }
 
-    public void updateAzimuth(float azimuth) {
+    void updateAzimuth(final float azimuth) {
         this.azimuth = azimuth;
         updateDirection();
     }
 
-    public void updateHeading(float heading) {
+    void updateHeading(final float heading) {
         this.heading = heading;
         updateDirection();
     }
 
-    public void updateCurrentCoords(@NonNull final Geopoint currentCoords) {
+    void updateCurrentCoords(@NonNull final Geopoint currentCoords) {
         if (targetCoords == null) {
             return;
         }
@@ -106,7 +108,7 @@ final public class CompassMiniView extends View {
         azimuthRelative = AngleUtils.normalize(azimuth - heading);
 
         // avoid updates on very small changes, which are not visible to the user
-        float change = Math.abs(azimuthRelative - lastDrawnAzimuth);
+        final float change = Math.abs(azimuthRelative - lastDrawnAzimuth);
         if (change < MINIMUM_ROTATION_DEGREES_FOR_REPAINT) {
             return;
         }
@@ -115,11 +117,11 @@ final public class CompassMiniView extends View {
         final int marginLeft = (getWidth() - compassArrowWidth) / 2;
         final int marginTop = (getHeight() - compassArrowHeight) / 2;
 
-        invalidate(marginLeft, marginTop, (marginLeft + compassArrowWidth), (marginTop + compassArrowHeight));
+        invalidate(marginLeft, marginTop, marginLeft + compassArrowWidth, marginTop + compassArrowHeight);
     }
 
     @Override
-    protected void onDraw(Canvas canvas) {
+    protected void onDraw(final Canvas canvas) {
         super.onDraw(canvas);
 
         lastDrawnAzimuth = azimuthRelative;
@@ -137,11 +139,11 @@ final public class CompassMiniView extends View {
     }
 
     @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+    protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
         setMeasuredDimension(measureWidth(widthMeasureSpec), measureHeight(heightMeasureSpec));
     }
 
-    private int measureWidth(int measureSpec) {
+    private int measureWidth(final int measureSpec) {
         final int specMode = MeasureSpec.getMode(measureSpec);
         final int specSize = MeasureSpec.getSize(measureSpec);
 
@@ -158,7 +160,7 @@ final public class CompassMiniView extends View {
         return result;
     }
 
-    private int measureHeight(int measureSpec) {
+    private int measureHeight(final int measureSpec) {
         final int specMode = MeasureSpec.getMode(measureSpec);
         final int specSize = MeasureSpec.getSize(measureSpec);
 

@@ -1,29 +1,38 @@
 package cgeo.geocaching.settings;
 
 import cgeo.geocaching.CgeoApplication;
-import cgeo.geocaching.DataStore;
 import cgeo.geocaching.Intents;
 import cgeo.geocaching.R;
 import cgeo.geocaching.SelectMapfileActivity;
 import cgeo.geocaching.activity.ActivityMixin;
-import cgeo.geocaching.apps.cache.navi.NavigationAppFactory;
-import cgeo.geocaching.apps.cache.navi.NavigationAppFactory.NavigationAppsEnum;
+import cgeo.geocaching.apps.navi.NavigationAppFactory;
+import cgeo.geocaching.apps.navi.NavigationAppFactory.NavigationAppsEnum;
+import cgeo.geocaching.connector.ConnectorFactory;
+import cgeo.geocaching.connector.capability.ICredentials;
+import cgeo.geocaching.connector.ec.ECConnector;
 import cgeo.geocaching.connector.gc.GCConnector;
+import cgeo.geocaching.connector.su.GeocachingSuConnector;
 import cgeo.geocaching.files.SimpleDirChooser;
+import cgeo.geocaching.gcvote.GCVote;
 import cgeo.geocaching.maps.MapProviderFactory;
 import cgeo.geocaching.maps.interfaces.MapSource;
+import cgeo.geocaching.network.AndroidBeam;
+import cgeo.geocaching.playservices.GooglePlayServices;
+import cgeo.geocaching.sensors.OrientationProvider;
+import cgeo.geocaching.sensors.RotationProvider;
 import cgeo.geocaching.sensors.Sensors;
+import cgeo.geocaching.storage.DataStore;
+import cgeo.geocaching.utils.AndroidRxUtils;
 import cgeo.geocaching.utils.DatabaseBackupUtils;
 import cgeo.geocaching.utils.DebugUtils;
 import cgeo.geocaching.utils.Log;
-import cgeo.geocaching.utils.RxUtils;
+import cgeo.geocaching.utils.ProcessUtils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.NonNull;
 import org.openintents.intents.FileManagerIntents;
 
-import rx.functions.Action0;
-import rx.schedulers.Schedulers;
-
+import android.R.string;
 import android.app.ProgressDialog;
 import android.app.backup.BackupManager;
 import android.content.ActivityNotFoundException;
@@ -41,12 +50,16 @@ import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
+import android.support.annotation.AnyRes;
 import android.widget.BaseAdapter;
 import android.widget.ListAdapter;
 
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
+
+import rx.functions.Action0;
+import rx.schedulers.Schedulers;
 
 /**
  * A {@link PreferenceActivity} that presents a set of application settings. On
@@ -62,6 +75,8 @@ import java.util.Locale;
 public class SettingsActivity extends PreferenceActivity {
 
     private static final String INTENT_OPEN_SCREEN = "OPEN_SCREEN";
+    public static final int NO_RESTART_NEEDED = 1;
+    public static final int RESTART_NEEDED = 2;
 
     /**
      * Enumeration for directory choosers. This is how we can retrieve information about the
@@ -90,16 +105,19 @@ public class SettingsActivity extends PreferenceActivity {
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         // Set light skin in preferences only for devices > 2.x, it doesn't work under 2.x
-        setTheme(Settings.isLightSkin() && Build.VERSION.SDK_INT > 10 ? R.style.settings_light : R.style.settings);
+        setTheme(Settings.isLightSkin() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB ? R.style.settings_light : R.style.settings);
         super.onCreate(savedInstanceState);
 
         initDeviceSpecificPreferences();
         initUnitPreferences();
-        SettingsActivity.addPreferencesFromResource(this, R.xml.preferences);
+        addPreferencesFromResource(this, R.xml.preferences);
         initPreferences();
 
         final Intent intent = getIntent();
         openInitialScreen(intent.getIntExtra(INTENT_OPEN_SCREEN, 0));
+        AndroidBeam.disable(this);
+
+        setResult(NO_RESTART_NEEDED);
     }
 
     private void openInitialScreen(final int initialScreen) {
@@ -132,28 +150,34 @@ public class SettingsActivity extends PreferenceActivity {
         initDbLocationPreference();
         initGeoDirPreferences();
         initDebugPreference();
+        initForceOrientationSensorPreference();
         initBasicMemberPreferences();
         initSend2CgeoPreferences();
         initServicePreferences();
         initNavigationMenuPreferences();
+        initLanguagePreferences();
         initMaintenanceButtons();
 
-        for (final int k : new int[] { R.string.pref_username, R.string.pref_password,
+        for (final int k : new int[] {
                 R.string.pref_pass_vote, R.string.pref_signature,
                 R.string.pref_mapsource, R.string.pref_renderthemepath,
                 R.string.pref_gpxExportDir, R.string.pref_gpxImportDir,
                 R.string.pref_mapDirectory, R.string.pref_defaultNavigationTool,
                 R.string.pref_defaultNavigationTool2, R.string.pref_webDeviceName,
                 R.string.pref_fakekey_preference_backup_info, R.string.pref_twitter_cache_message, R.string.pref_twitter_trackable_message,
-                R.string.pref_ecusername, R.string.pref_ecpassword, R.string.pref_ec_icons }) {
+                R.string.pref_ec_icons }) {
             bindSummaryToStringValue(k);
         }
+        bindGeocachingUserToGCVoteuser();
     }
 
     private void initNavigationMenuPreferences() {
         for (final NavigationAppsEnum appEnum : NavigationAppsEnum.values()) {
+            final Preference preference = getPreference(appEnum.preferenceKey);
             if (appEnum.app.isInstalled()) {
-                getPreference(appEnum.preferenceKey).setEnabled(true);
+                preference.setEnabled(true);
+            } else {
+                preference.setSummary(R.string.settings_navigation_disabled);
             }
         }
         getPreference(R.string.preference_screen_basicmembers)
@@ -171,33 +195,34 @@ public class SettingsActivity extends PreferenceActivity {
         setWebsite(R.string.pref_fakekey_gc_website, GCConnector.getInstance().getHost());
         getPreference(R.string.preference_screen_gc).setSummary(getServiceSummary(Settings.isGCConnectorActive()));
 
-        getPreference(R.string.pref_connectorOXActive).setOnPreferenceChangeListener(VALUE_CHANGE_LISTENER);
-        setWebsite(R.string.pref_fakekey_ox_website, "opencaching.com");
-        getPreference(R.string.preference_screen_ox).setSummary(getServiceSummary(Settings.isOXConnectorActive()));
-
         getPreference(R.string.pref_connectorECActive).setOnPreferenceChangeListener(VALUE_CHANGE_LISTENER);
-        setWebsite(R.string.pref_fakekey_ec_website, "extremcaching.com");
+        setWebsite(R.string.pref_fakekey_ec_website, ECConnector.getInstance().getHost());
         getPreference(R.string.preference_screen_ec).setSummary(getServiceSummary(Settings.isECConnectorActive()));
 
+        getPreference(R.string.pref_connectorSUActive).setOnPreferenceChangeListener(VALUE_CHANGE_LISTENER);
+        setWebsite(R.string.pref_fakekey_su_website, GeocachingSuConnector.getInstance().getHost());
+        getPreference(R.string.preference_screen_su).setSummary(getServiceSummary(Settings.isSUConnectorActive()));
+
         getPreference(R.string.pref_ratingwanted).setOnPreferenceChangeListener(VALUE_CHANGE_LISTENER);
-        setWebsite(R.string.pref_fakekey_gcvote_website, "gcvote.com");
+        setWebsite(R.string.pref_fakekey_gcvote_website, GCVote.getWebsite());
         getPreference(R.string.preference_screen_gcvote).setSummary(getServiceSummary(Settings.isRatingWanted()));
+
+        getPreference(R.string.pref_connectorGeokretyActive).setOnPreferenceChangeListener(VALUE_CHANGE_LISTENER);
+        setWebsite(R.string.pref_fakekey_geokrety_website, "https://geokrety.org");
+        setWebsite(R.string.pref_fakekey_geokretymap_website, "https://geokretymap.org");
+        getPreference(R.string.preference_screen_geokrety).setSummary(getServiceSummary(Settings.isGeokretyConnectorActive()));
 
         setWebsite(R.string.pref_fakekey_sendtocgeo_website, "send2.cgeo.org");
         getPreference(R.string.preference_screen_sendtocgeo).setSummary(getServiceSummary(Settings.isRegisteredForSend2cgeo()));
     }
 
-    private void setWebsite(final int preferenceKey, final String host) {
+    private void setWebsite(final int preferenceKey, final String urlOrHost) {
         final Preference preference = getPreference(preferenceKey);
         preference.setOnPreferenceClickListener(new OnPreferenceClickListener() {
             @Override
             public boolean onPreferenceClick(final Preference preference) {
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://" + host)));
-                } catch (final ActivityNotFoundException e) {
-                    Log.e("Cannot find suitable activity", e);
-                    ActivityMixin.showToast(SettingsActivity.this, R.string.err_application_no);
-                }
+                final String url = StringUtils.startsWith(urlOrHost, "http") ? urlOrHost : "http://" + urlOrHost;
+                ProcessUtils.openUri(url, SettingsActivity.this);
                 return true;
             }
         });
@@ -212,7 +237,7 @@ public class SettingsActivity extends PreferenceActivity {
     }
 
     private Preference getPreference(final int keyId) {
-        return SettingsActivity.findPreference(this, getKey(keyId));
+        return findPreference(this, getKey(keyId));
     }
 
     /**
@@ -246,12 +271,12 @@ public class SettingsActivity extends PreferenceActivity {
             values[i] = String.valueOf(apps.get(i).id);
         }
 
-        ListPreference pref = (ListPreference) getPreference(R.string.pref_defaultNavigationTool);
-        pref.setEntries(entries);
-        pref.setEntryValues(values);
-        pref = (ListPreference) getPreference(R.string.pref_defaultNavigationTool2);
-        pref.setEntries(entries);
-        pref.setEntryValues(values);
+        final ListPreference defaultNavigationTool = (ListPreference) getPreference(R.string.pref_defaultNavigationTool);
+        defaultNavigationTool.setEntries(entries);
+        defaultNavigationTool.setEntryValues(values);
+        final ListPreference defaultNavigationTool2 = (ListPreference) getPreference(R.string.pref_defaultNavigationTool2);
+        defaultNavigationTool2.setEntries(entries);
+        defaultNavigationTool2.setEntryValues(values);
     }
 
     private void initDirChoosers() {
@@ -271,9 +296,9 @@ public class SettingsActivity extends PreferenceActivity {
                 new OnPreferenceClickListener() {
                     @Override
                     public boolean onPreferenceClick(final Preference preference) {
-                        final Intent i = new Intent(SettingsActivity.this,
+                        final Intent intent = new Intent(SettingsActivity.this,
                                 SelectMapfileActivity.class);
-                        startActivityForResult(i, R.string.pref_mapDirectory);
+                        startActivityForResult(intent, R.string.pref_mapDirectory);
                         return false;
                     }
                 });
@@ -299,7 +324,7 @@ public class SettingsActivity extends PreferenceActivity {
             dirChooser.putExtra(FileManagerIntents.EXTRA_TITLE,
                     getString(R.string.simple_dir_chooser_title));
             dirChooser.putExtra(FileManagerIntents.EXTRA_BUTTON_TEXT,
-                    getString(android.R.string.ok));
+                    getString(string.ok));
             startActivityForResult(dirChooser, dct.requestCode);
         } catch (final ActivityNotFoundException ignored) {
             // OI file manager not available
@@ -322,7 +347,7 @@ public class SettingsActivity extends PreferenceActivity {
         }
     }
 
-    public void initBackupButtons() {
+    private void initBackupButtons() {
         final Preference backup = getPreference(R.string.pref_fakekey_preference_backup);
         backup.setOnPreferenceClickListener(new OnPreferenceClickListener() {
             @Override
@@ -331,7 +356,7 @@ public class SettingsActivity extends PreferenceActivity {
 
                     @Override
                     public void run() {
-                        VALUE_CHANGE_LISTENER.onPreferenceChange(SettingsActivity.this.getPreference(R.string.pref_fakekey_preference_backup_info), "");
+                        VALUE_CHANGE_LISTENER.onPreferenceChange(getPreference(R.string.pref_fakekey_preference_backup_info), "");
                     }
                 });
                 return true;
@@ -348,7 +373,7 @@ public class SettingsActivity extends PreferenceActivity {
         });
     }
 
-    public void initMaintenanceButtons() {
+    private void initMaintenanceButtons() {
         final Preference dirMaintenance = getPreference(R.string.pref_fakekey_preference_maintenance_directories);
         dirMaintenance.setOnPreferenceClickListener(new OnPreferenceClickListener() {
             @Override
@@ -359,7 +384,7 @@ public class SettingsActivity extends PreferenceActivity {
                 final Resources res = getResources();
                 final SettingsActivity activity = SettingsActivity.this;
                 final ProgressDialog dialog = ProgressDialog.show(activity, res.getString(R.string.init_maintenance), res.getString(R.string.init_maintenance_directories), true, false);
-                RxUtils.andThenOnUi(Schedulers.io(), new Action0() {
+                AndroidRxUtils.andThenOnUi(Schedulers.io(), new Action0() {
                     @Override
                     public void call() {
                         DataStore.removeObsoleteCacheDirectories();
@@ -373,9 +398,9 @@ public class SettingsActivity extends PreferenceActivity {
                 return true;
                 }
             });
-		final Preference memoryDumpPref = getPreference(R.string.pref_memory_dump);
-		memoryDumpPref
-				.setOnPreferenceClickListener(new OnPreferenceClickListener() {
+        final Preference memoryDumpPref = getPreference(R.string.pref_memory_dump);
+        memoryDumpPref
+                .setOnPreferenceClickListener(new OnPreferenceClickListener() {
                     @Override
                     public boolean onPreferenceClick(
                             final Preference preference) {
@@ -385,7 +410,7 @@ public class SettingsActivity extends PreferenceActivity {
                 });
     }
 
-    public static void initDeviceSpecificPreferences() {
+    private static void initDeviceSpecificPreferences() {
         // We have to ensure that those preferences are initialized so that devices with specific default values
         // will get the appropriate ones.
         Settings.setUseHardwareAcceleration(Settings.useHardwareAcceleration());
@@ -422,6 +447,31 @@ public class SettingsActivity extends PreferenceActivity {
         });
     }
 
+    private void initForceOrientationSensorPreference() {
+        final Preference p = getPreference(R.string.pref_force_orientation_sensor);
+        p.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(final Preference preference, final Object newValue) {
+                final boolean useOrientationSensor = (Boolean) newValue;
+                Settings.setForceOrientationSensor(useOrientationSensor);
+                Sensors.getInstance().setupDirectionObservable();
+                return true;
+            }
+        });
+        p.setEnabled(OrientationProvider.hasOrientationSensor(this) && RotationProvider.hasRotationSensor(this));
+    }
+
+    private void initLanguagePreferences() {
+        final Preference p = getPreference(R.string.pref_useenglish);
+        p.setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(final Preference preference, final Object newValue) {
+                setResult(RESTART_NEEDED);
+                return true;
+            }
+        });
+    }
+
     private void initGeoDirPreferences() {
         final Sensors sensors = Sensors.getInstance();
         final Preference playServices = getPreference(R.string.pref_googleplayservices);
@@ -432,13 +482,13 @@ public class SettingsActivity extends PreferenceActivity {
                 return true;
             }
         });
-        playServices.setEnabled(CgeoApplication.getInstance().isGooglePlayServicesAvailable());
+        playServices.setEnabled(GooglePlayServices.isAvailable());
         getPreference(R.string.pref_lowpowermode).setOnPreferenceChangeListener(new OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(final Preference preference, final Object newValue) {
-                final Boolean useLowPower = (Boolean) newValue;
+                final boolean useLowPower = (Boolean) newValue;
                 sensors.setupGeoDataObservables(Settings.useGooglePlayServices(), useLowPower);
-                sensors.setupDirectionObservable(useLowPower);
+                sensors.setupDirectionObservable();
                 return true;
             }
         });
@@ -462,12 +512,12 @@ public class SettingsActivity extends PreferenceActivity {
      * @param key
      *            Key of a preference screen.
      */
-    void redrawScreen(final int key) {
+    private void redrawScreen(final int key) {
         final Preference preference = getPreference(key);
         redrawScreen(preference);
     }
 
-    static void redrawScreen(final Preference preference) {
+    private static void redrawScreen(final Preference preference) {
         if (!(preference instanceof PreferenceScreen)) {
             return;
         }
@@ -484,36 +534,89 @@ public class SettingsActivity extends PreferenceActivity {
 
     public void setAuthTitle(final int prefKeyId) {
         switch (prefKeyId) {
+            case R.string.pref_fakekey_gc_authorization:
+                setAuthTitle(prefKeyId, GCConnector.getInstance());
+                setConnectedUsernameTitle(prefKeyId, GCConnector.getInstance());
+                break;
             case R.string.pref_fakekey_ocde_authorization:
             case R.string.pref_fakekey_ocpl_authorization:
             case R.string.pref_fakekey_ocnl_authorization:
             case R.string.pref_fakekey_ocus_authorization:
             case R.string.pref_fakekey_ocro_authorization:
             case R.string.pref_fakekey_ocuk_authorization:
-                setOCAuthTitle(OCPreferenceKeys.getByAuthId(prefKeyId));
+                final OCPreferenceKeys key = OCPreferenceKeys.getByAuthId(prefKeyId);
+                if (key != null) {
+                    setOCAuthTitle(key);
+                    setConnectedTitle(prefKeyId, Settings.hasOCAuthorization(key.publicTokenPrefId, key.privateTokenPrefId));
+                } else {
+                    setConnectedTitle(prefKeyId, false);
+                }
+                break;
+            case R.string.pref_fakekey_ec_authorization:
+                setAuthTitle(prefKeyId, ECConnector.getInstance());
+                setConnectedUsernameTitle(prefKeyId, ECConnector.getInstance());
+                break;
+            case R.string.pref_fakekey_gcvote_authorization:
+                setAuthTitle(prefKeyId, GCVote.getInstance());
+                setConnectedUsernameTitle(prefKeyId, GCVote.getInstance());
                 break;
             case R.string.pref_fakekey_twitter_authorization:
                 setTwitterAuthTitle();
+                setConnectedTitle(prefKeyId, Settings.hasTwitterAuthorization());
+                break;
+            case R.string.pref_fakekey_geokrety_authorization:
+                setGeokretyAuthTitle();
+                setConnectedTitle(prefKeyId, Settings.hasGeokretyAuthorization());
                 break;
             default:
                 Log.e(String.format(Locale.ENGLISH, "Invalid key %d in SettingsActivity.setTitle()", prefKeyId));
         }
     }
 
-    void setOCAuthTitle(final OCPreferenceKeys key) {
-        if (key != null) {
-            getPreference(key.authPrefId)
-                    .setTitle(getString(Settings.hasOCAuthorization(key.publicTokenPrefId, key.privateTokenPrefId)
-                            ? R.string.settings_reauthorize
-                            : R.string.settings_authorize));
-        }
+    private void setOCAuthTitle(final OCPreferenceKeys key) {
+        getPreference(key.authPrefId)
+                .setTitle(getString(Settings.hasOCAuthorization(key.publicTokenPrefId, key.privateTokenPrefId)
+                        ? R.string.settings_reauthorize
+                        : R.string.settings_authorize));
     }
 
-    void setTwitterAuthTitle() {
+    private void setTwitterAuthTitle() {
         getPreference(R.string.pref_fakekey_twitter_authorization)
                 .setTitle(getString(Settings.hasTwitterAuthorization()
                         ? R.string.settings_reauthorize
                         : R.string.settings_authorize));
+    }
+
+    private void setGeokretyAuthTitle() {
+        getPreference(R.string.pref_fakekey_geokrety_authorization)
+                .setTitle(getString(Settings.hasGeokretyAuthorization()
+                        ? R.string.settings_reauthorize
+                        : R.string.settings_authorize));
+    }
+
+    private void setAuthTitle(final int prefKeyId, @NonNull final ICredentials connector) {
+        final Credentials credentials = Settings.getCredentials(connector);
+
+        getPreference(prefKeyId)
+                .setTitle(getString(StringUtils.isNotBlank(credentials.getUsernameRaw())
+                        ? R.string.settings_reauthorize
+                        : R.string.settings_authorize));
+    }
+
+    private void setConnectedUsernameTitle(final int prefKeyId, @NonNull final ICredentials connector) {
+        final Credentials credentials = Settings.getCredentials(connector);
+
+        getPreference(prefKeyId)
+                .setSummary(StringUtils.isNotBlank(credentials.getUsernameRaw())
+                        ? getString(R.string.auth_connected_as, credentials.getUserName())
+                        : getString(R.string.auth_unconnected));
+    }
+
+    private void setConnectedTitle(final int prefKeyId, final boolean hasToken) {
+        getPreference(prefKeyId)
+                .setSummary(getString(hasToken
+                        ? R.string.auth_connected
+                        : R.string.auth_unconnected));
     }
 
     public static void openForScreen(final int preferenceScreenKey, final Context fromActivity) {
@@ -569,12 +672,37 @@ public class SettingsActivity extends PreferenceActivity {
                 final OCPreferenceKeys key = OCPreferenceKeys.getByAuthId(requestCode);
                 if (key != null) {
                     setOCAuthTitle(key);
+                    setConnectedTitle(requestCode, Settings.hasOCAuthorization(key.publicTokenPrefId, key.privateTokenPrefId));
                     redrawScreen(key.prefScreenId);
+                } else {
+                    setConnectedTitle(requestCode, false);
                 }
+                break;
+            case R.string.pref_fakekey_gc_authorization:
+                setAuthTitle(requestCode, GCConnector.getInstance());
+                setConnectedUsernameTitle(requestCode, GCConnector.getInstance());
+                redrawScreen(R.string.preference_screen_gc);
+                initBasicMemberPreferences();
+                break;
+            case R.string.pref_fakekey_ec_authorization:
+                setAuthTitle(requestCode, ECConnector.getInstance());
+                setConnectedUsernameTitle(requestCode, ECConnector.getInstance());
+                redrawScreen(R.string.preference_screen_ec);
+                break;
+            case R.string.pref_fakekey_gcvote_authorization:
+                setAuthTitle(requestCode, GCVote.getInstance());
+                setConnectedUsernameTitle(requestCode, GCVote.getInstance());
+                redrawScreen(R.string.init_gcvote);
                 break;
             case R.string.pref_fakekey_twitter_authorization:
                 setTwitterAuthTitle();
+                setConnectedTitle(requestCode, Settings.hasTwitterAuthorization());
                 redrawScreen(R.string.preference_screen_twitter);
+                break;
+            case R.string.pref_fakekey_geokrety_authorization:
+                setGeokretyAuthTitle();
+                setConnectedTitle(requestCode, Settings.hasGeokretyAuthorization());
+                redrawScreen(R.string.preference_screen_geokrety);
                 break;
             default:
                 throw new IllegalArgumentException();
@@ -587,11 +715,9 @@ public class SettingsActivity extends PreferenceActivity {
      */
     private static final Preference.OnPreferenceChangeListener VALUE_CHANGE_LISTENER = new Preference.OnPreferenceChangeListener() {
 
-        private PreferenceManager preferenceManager;
-
         @Override
         public boolean onPreferenceChange(final Preference preference, final Object value) {
-            preferenceManager = preference.getPreferenceManager();
+            final PreferenceManager preferenceManager = preference.getPreferenceManager();
             final String stringValue = value.toString();
 
             if (isPreference(preference, R.string.pref_mapsource)) {
@@ -624,7 +750,6 @@ public class SettingsActivity extends PreferenceActivity {
                     || isPreference(preference, R.string.pref_connectorOCROActive)
                     || isPreference(preference, R.string.pref_connectorOCUKActive)
                     || isPreference(preference, R.string.pref_connectorGCActive)
-                    || isPreference(preference, R.string.pref_connectorOXActive)
                     || isPreference(preference, R.string.pref_connectorECActive)) {
                 // update summary
                 final boolean boolVal = (Boolean) value;
@@ -634,14 +759,12 @@ public class SettingsActivity extends PreferenceActivity {
                     preference.getPreferenceManager().findPreference(getKey(prefKey.prefScreenId)).setSummary(summary);
                 } else if (isPreference(preference, R.string.pref_connectorGCActive)) {
                     preference.getPreferenceManager().findPreference(getKey(R.string.preference_screen_gc)).setSummary(summary);
-                } else if (isPreference(preference, R.string.pref_connectorOXActive)) {
-                    preference.getPreferenceManager().findPreference(getKey(R.string.preference_screen_ox)).setSummary(summary);
                 } else if (isPreference(preference, R.string.pref_connectorECActive)) {
                     preference.getPreferenceManager().findPreference(getKey(R.string.preference_screen_ec)).setSummary(summary);
                 }
                 redrawScreen(preference.getPreferenceManager().findPreference(getKey(R.string.preference_screen_services)));
                 // reset log-in status if connector activation was changed
-                CgeoApplication.getInstance().forceRelog();
+                ConnectorFactory.forceRelog();
             } else if (preference instanceof ListPreference) {
                 // For list preferences, look up the correct display value in
                 // the preference's 'entries' list.
@@ -663,23 +786,17 @@ public class SettingsActivity extends PreferenceActivity {
                 }
                 preference.setSummary(text);
             } else if (isPreference(preference, R.string.pref_ratingwanted)) {
-                findPreference(R.string.preference_screen_gcvote).setSummary(getServiceSummary((Boolean) value));
-                redrawScreen(findPreference(R.string.preference_screen_services));
+                preferenceManager.findPreference(getKey(R.string.preference_screen_gcvote)).setSummary(getServiceSummary((Boolean) value));
+                redrawScreen(preferenceManager.findPreference(getKey(R.string.preference_screen_services)));
+            } else if (isPreference(preference, R.string.pref_connectorGeokretyActive)) {
+                preferenceManager.findPreference(getKey(R.string.preference_screen_geokrety)).setSummary(getServiceSummary((Boolean) value));
+                redrawScreen(preferenceManager.findPreference(getKey(R.string.preference_screen_services)));
             } else {
                 // For all other preferences, set the summary to the value's
                 // simple string representation.
                 preference.setSummary(stringValue);
             }
-            // TODO: do not special case geocaching.com here
-            if ((isPreference(preference, R.string.pref_username) && !stringValue.equals(Settings.getUsername())) || (isPreference(preference, R.string.pref_password) && !stringValue.equals(Settings.getGcCredentials().getRight()))) {
-                // reset log-in if gc user or password is changed
-                CgeoApplication.getInstance().forceRelog();
-            }
             return true;
-        }
-
-        private Preference findPreference(final int preferenceKeyResourceId) {
-            return preferenceManager.findPreference(getKey(preferenceKeyResourceId));
         }
 
     };
@@ -722,13 +839,25 @@ public class SettingsActivity extends PreferenceActivity {
         bindSummaryToValue(pref, value);
     }
 
+    private void bindGeocachingUserToGCVoteuser() {
+
+        if (!Settings.hasGCCredentials()) {
+            return;
+        }
+
+        final String value = Settings.getGcCredentials().getUserName();
+        getPreference(R.string.pref_fakekey_gcvote_authorization).setSummary(value);
+        final Preference prefvote = getPreference(R.string.pref_user_vote);
+        bindSummaryToValue(prefvote, value);
+    }
+
     @SuppressWarnings("deprecation")
-    public static Preference findPreference(final PreferenceActivity preferenceActivity, final CharSequence key) {
+    private static Preference findPreference(final PreferenceActivity preferenceActivity, final CharSequence key) {
         return preferenceActivity.findPreference(key);
     }
 
     @SuppressWarnings("deprecation")
-    public static void addPreferencesFromResource(final PreferenceActivity preferenceActivity, final int preferencesResId) {
+    private static void addPreferencesFromResource(final PreferenceActivity preferenceActivity, @AnyRes final int preferencesResId) {
         preferenceActivity.addPreferencesFromResource(preferencesResId);
     }
 

@@ -10,25 +10,25 @@ import cgeo.geocaching.utils.RxUtils;
 
 import org.eclipse.jdt.annotation.NonNull;
 
-import rx.Observable;
-import rx.functions.Action1;
-import rx.functions.Func1;
-
+import android.app.Application;
 import android.content.Context;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import rx.Observable;
+import rx.functions.Action1;
+import rx.functions.Func1;
 
 public class Sensors {
 
     private Observable<GeoData> geoDataObservable;
     private Observable<GeoData> geoDataObservableLowPower;
     private Observable<Float> directionObservable;
-    private Observable<Status> gpsStatusObservable;
+    private final Observable<Status> gpsStatusObservable;
     @NonNull private volatile GeoData currentGeo = GeoData.DUMMY_LOCATION;
     private volatile float currentDirection = 0.0f;
-    private volatile boolean hasValidLocation = false;
     private final boolean hasCompassCapabilities;
-    private final CgeoApplication app = CgeoApplication.getInstance();
+    private final Application app = CgeoApplication.getInstance();
 
     private static class InstanceHolder {
         static final Sensors INSTANCE = new Sensors();
@@ -38,7 +38,6 @@ public class Sensors {
         @Override
         public void call(final GeoData geoData) {
             currentGeo = geoData;
-            hasValidLocation = true;
         }
     };
 
@@ -50,9 +49,11 @@ public class Sensors {
     };
 
     private Sensors() {
-        gpsStatusObservable = GpsStatusProvider.create(app).replay(1).refCount();
+        gpsStatusObservable = GpsStatusProvider.create(app).replay(1).refCount().onBackpressureLatest();
         final Context context = CgeoApplication.getInstance().getApplicationContext();
-        hasCompassCapabilities = RotationProvider.hasRotationSensor(context) || OrientationProvider.hasOrientationSensor(context);
+        hasCompassCapabilities = RotationProvider.hasRotationSensor(context) ||
+                                OrientationProvider.hasOrientationSensor(context) ||
+                                MagnetometerAndAccelerometerProvider.hasMagnetometerAndAccelerometerSensors(context);
     }
 
     public static final Sensors getInstance() {
@@ -89,7 +90,7 @@ public class Sensors {
         }
     };
 
-    public void setupDirectionObservable(final boolean useLowPower) {
+    public void setupDirectionObservable() {
         // If we have no magnetic sensor, there is no point in trying to setup any, we will always get the direction from the GPS.
         if (!hasCompassCapabilities) {
             Log.i("No compass capabilities, using only the GPS for the orientation");
@@ -100,13 +101,21 @@ public class Sensors {
         // Combine the magnetic direction observable with the GPS when compass is disabled or speed is high enough.
         final AtomicBoolean useDirectionFromGps = new AtomicBoolean(false);
 
-        // The rotation sensor seems to be bogus on some devices. We should start with the orientation one, except when we explicitely
-        // want to use the low-power geomagnetic rotation sensor or when we do not have an orientation sensor.
-        final boolean useRotationSensor = (useLowPower && RotationProvider.hasGeomagneticRotationSensor(app)) || !OrientationProvider.hasOrientationSensor(app);
-        final Observable<Float> sensorDirectionObservable = useRotationSensor ? RotationProvider.create(app, useLowPower) : OrientationProvider.create(app);
-        final Observable<Float> magneticDirectionObservable = sensorDirectionObservable.onErrorResumeNext(new Func1<Throwable, Observable<? extends Float>>() {
+        // On some devices, the orientation sensor (Xperia and S4 running Lollipop) seems to have been deprecated for real.
+        // Use the rotation sensor if it is available unless the orientatation sensor is forced by the user.
+        // After updating Moto G there is no rotation sensor anymore. Use magnetic field and accelerometer instead.
+        final Observable<Float> sensorDirectionObservable;
+        if (Settings.useOrientationSensor(app)) {
+            sensorDirectionObservable = OrientationProvider.create(app);
+        } else if (RotationProvider.hasRotationSensor(app)) {
+            sensorDirectionObservable = RotationProvider.create(app);
+        } else {
+            sensorDirectionObservable = MagnetometerAndAccelerometerProvider.create(app);
+        }
+
+        final Observable<Float> magneticDirectionObservable = sensorDirectionObservable.onErrorResumeNext(new Func1<Throwable, Observable<Float>>() {
             @Override
-            public Observable<? extends Float> call(final Throwable throwable) {
+            public Observable<Float> call(final Throwable throwable) {
                 Log.e("Device orientation is not available due to sensors error, disabling compass", throwable);
                 Settings.setUseCompass(false);
                 return Observable.<Float>never().startWith(0.0f);
@@ -139,19 +148,12 @@ public class Sensors {
     }
 
     public Observable<Status> gpsStatusObservable() {
-        if (gpsStatusObservable == null) {
-            gpsStatusObservable = GpsStatusProvider.create(app).share();
-        }
         return gpsStatusObservable;
     }
 
     @NonNull
     public GeoData currentGeo() {
         return currentGeo;
-    }
-
-    public boolean hasValidLocation() {
-        return hasValidLocation;
     }
 
     public float currentDirection() {

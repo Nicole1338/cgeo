@@ -10,10 +10,13 @@ import android.os.Bundle;
 
 public class Intents {
 
+    public static final int SETTINGS_ACTIVITY_REQUEST_CODE = 1;
+    public static final int SEARCH_REQUEST_CODE = 2;
+    public static final int APP_INVITE_REQUEST_CODE = 3;
+
     private Intents() {
         // Do not instantiate
     }
-
     private static final String PREFIX = "cgeo.geocaching.intent.extra.";
 
     public static final String EXTRA_ADDRESS = PREFIX + "address";
@@ -22,25 +25,28 @@ public class Intents {
     public static final String EXTRA_LONGITUDE = PREFIX + "longitude";
     public static final String EXTRA_COUNT = PREFIX + "count";
     public static final String EXTRA_GEOCODE = PREFIX + "geocode";
+    public static final String EXTRA_GEOCACHE = PREFIX + "geocache";
     public static final String EXTRA_GUID = PREFIX + "guid";
+    public static final String EXTRA_BRAND = PREFIX + "brand";
+    public static final String EXTRA_IMAGE = PREFIX + "image";
     public static final String EXTRA_IMAGES = PREFIX + "images";
     public static final String EXTRA_ID = PREFIX + "id";
     public static final String EXTRA_KEYWORD = PREFIX + "keyword";
     public static final String EXTRA_KEYWORD_SEARCH = PREFIX + "keyword_search";
     public static final String EXTRA_LIST_ID = PREFIX + "list_id";
-    public static final String EXTRA_CAPTION = PREFIX + "caption";
-    public static final String EXTRA_DESCRIPTION = PREFIX + "description";
-    public static final String EXTRA_URI_AS_STRING = PREFIX + "uri";
+    public static final String EXTRA_COORD_DESCRIPTION = PREFIX + "coord_description";
     public static final String EXTRA_SCALE = PREFIX + "scale";
+    public static final String EXTRA_WPT_PAGE_UPDATE = PREFIX + "wpt_page_update";
 
     public static final String EXTRA_WPTTYPE = PREFIX + "wpttype";
     public static final String EXTRA_MAPSTATE = PREFIX + "mapstate";
-    public static final String EXTRA_MAP_TITLE = PREFIX + "mapTitle";
+    public static final String EXTRA_TITLE = PREFIX + "title";
     public static final String EXTRA_MAP_MODE = PREFIX + "mapMode";
     public static final String EXTRA_LIVE_ENABLED = PREFIX + "liveEnabled";
 
     public static final String EXTRA_DOWNLOAD = PREFIX + "download";
 
+    public static final String EXTRA_TARGET_INFO = PREFIX + "targetInfo";
     /**
      * list type to be used with the cache list activity. Be aware to use the String representation of the corresponding
      * enum.
@@ -77,17 +83,31 @@ public class Intents {
     public static final String EXTRA_OAUTH_TOKEN_PUBLIC_KEY = PREFIX_OAUTH + "publicTokenPref";
     public static final String EXTRA_OAUTH_TOKEN_SECRET_KEY = PREFIX_OAUTH + "secretTokenPref";
 
-    public static Intent putListType(final Intent intent, final @NonNull CacheListType listType) {
-        intent.putExtra(Intents.EXTRA_LIST_TYPE, listType.name());
+    private static final String PREFIX_TOKEN_AUTH = "cgeo.geocaching.intent.tokenauth.";
+    public static final String EXTRA_TOKEN_AUTH_URL_TOKEN = PREFIX_TOKEN_AUTH + "token";
+    public static final String EXTRA_TOKEN_AUTH_URL_REGISTER = PREFIX_TOKEN_AUTH + "register";
+    public static final String EXTRA_TOKEN_AUTH_USERNAME = PREFIX_TOKEN_AUTH + "username";
+    public static final String EXTRA_TOKEN_AUTH_PASSWORD = PREFIX_TOKEN_AUTH + "password";
+
+    private static final String PREFIX_CREDENTIALS_AUTH = "cgeo.geocaching.intent.credentialsauth.";
+    public static final String EXTRA_CREDENTIALS_AUTH_USERNAME = PREFIX_CREDENTIALS_AUTH + "username";
+    public static final String EXTRA_CREDENTIALS_AUTH_PASSWORD = PREFIX_CREDENTIALS_AUTH + "password";
+
+    private static final String PREFIX_INTERNAL = "cgeo.geocaching.intent.internal.";
+    public static final String INTENT_CACHE_CHANGED = PREFIX_INTERNAL + "cache-changed";
+
+    public static Intent putListType(final Intent intent, @NonNull final CacheListType listType) {
+        intent.putExtra(EXTRA_LIST_TYPE, listType.name());
         return intent;
     }
 
-    public static @NonNull CacheListType getListType(final Intent intent) {
+    @NonNull
+    public static CacheListType getListType(final Intent intent) {
         final Bundle extras = intent.getExtras();
         if (extras == null) {
             return CacheListType.OFFLINE;
         }
-        final String typeName = extras.getString(Intents.EXTRA_LIST_TYPE);
+        final String typeName = extras.getString(EXTRA_LIST_TYPE);
         if (StringUtils.isBlank(typeName)) {
             return CacheListType.OFFLINE;
         }
